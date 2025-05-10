@@ -1,10 +1,10 @@
-import random
-import os
 import asyncio
-import telegram
-from aiogram import Bot, Dispatcher, F, Router, types
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+import os
+import random
+
+from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -84,9 +84,10 @@ async def settings(message: Message):
 @router.callback_query(lambda c: c.data == 'name')
 async def name(callback_query: types.CallbackQuery, bot: Bot):
     print(f'{set=}')
-    await bot.edit_message_reply_markup(set.chat.id, set.message_id, reply_markup=InlineKeyboardMarkup(
+    await bot.edit_message_reply_markup(chat_id=set.chat.id,
+                                        message_id=set.message_id, reply_markup=InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='ФИ')]
+            [InlineKeyboardButton(text='ФИ', callback_data='full_name')],
         ]
     ))
 
