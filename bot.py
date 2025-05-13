@@ -9,6 +9,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+# Helper function to send "..." before any message
+async def send_typing_indicator(chat_id, bot):
+    ellipsis = await bot.send_message(chat_id, "...")
+    await asyncio.sleep(1)
+    await bot.delete_message(chat_id, ellipsis.message_id)
+
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
 ])
@@ -27,7 +34,7 @@ dev_keyboard = ReplyKeyboardMarkup(keyboard=[
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
-    [KeyboardButton(text="Info", )],
+    [KeyboardButton(text="info", )],
     [KeyboardButton(text='Настройки (beta)')],
 ], resize_keyboard=True)
 
@@ -40,23 +47,24 @@ router = Router()
 
 @router.message(Command('start'))
 async def start_bot(message: Message):
+    await send_typing_indicator(message.chat.id, message.bot)
     await message.answer("Здравствуйте, я **MuziatikBot**. Нажмите на _кнопку_ внизу, чтобы узнать больше обо мне.",
                          parse_mode="Markdown",
-                         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Info')]],
+                         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='info')]],
                                                           resize_keyboard=True))
 
 
-@router.message(lambda msg: msg.text == 'Info')
+@router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA')
     await asyncio.sleep(3)
     await message.reply('Вот infoрмаация о MuziatikBot:\n'
-                        'Версия — 1.6\nДоступность фнкций: Выбрать имя — предпросмотр, Возможности Bot_v1 — начальная стадия,\n Кубик — публичный предпросмотр.',
+                        'Версия — 1.6\nДоступность функций: Выбрать имя — предпросмотр, Возможности Bot_v1 — начальная стадия,\n Кубик — публичный предпросмотр.',
                         reply_markup=keyboard)
 
 
-@router.message(lambda msg: "Кубик" in msg.text)
+@router.message(lambda msg: "Кубик" in msg.text or 'die' in msg.text)
 async def dice(message: Message, bot: Bot):
     inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
@@ -75,10 +83,11 @@ async def roll_dice(callback_query: types.CallbackQuery, bot: Bot):
 @router.callback_query(lambda c: c.data == "text_dice")
 async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
     dice_result = random.randint(1, 6)
+    await send_typing_indicator(callback_query.from_user.id, bot)
     await bot.send_message(callback_query.from_user.id, f"Выпало: {dice_result}")
 
 
-@router.message(lambda msg: msg.text == 'Настройки (beta)')
+@router.message(lambda msg: msg.text == 'Настройки (beta)' or msg.text == 'Settings')
 async def settings(message: Message):
     global set
     set = await message.reply('Вот _beta_ настройки', reply_markup=settings_keyboard,
@@ -101,26 +110,29 @@ async def name(callback_query: types.CallbackQuery, bot: Bot):
 @router.callback_query(lambda c: c.data == 'full_name')
 async def full_name(callback_query: types.CallbackQuery, bot: Bot):
     name = callback_query.from_user.full_name
+    await send_typing_indicator(callback_query.message.chat.id, bot)
     await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
 
 
 @router.callback_query(lambda c: c.data == 'username')
 async def username(callback_query: types.CallbackQuery, bot: Bot):
     name = callback_query.from_user.username
+    await send_typing_indicator(callback_query.message.chat.id, bot)
     await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
 
 
 @router.message(lambda msg: msg.text == 'dev')
 async def dev(message: Message):
+    await send_typing_indicator(message.chat.id, message.bot)
     await message.reply('Okei-dokei', reply_markup=dev_keyboard)
 
 
-@router.message(lambda msg: msg.text == 'Отзыв')
+@router.message(lambda msg: msg.text == 'Отзыв' or 'Feedback' in msg.text)
 async def feedback(message: Message):
+    await send_typing_indicator(message.chat.id, message.bot)
     await message.reply(
         '_Напишите_ Ваш отзыв (функция неработает)',
-        parse_mode="Markdown",
-        reply_markup=keyboard)
+        parse_mode="Markdown")
 
 
 async def main():
