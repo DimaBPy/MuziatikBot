@@ -1,0 +1,15 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: |
+          ssh dima@176.53.146.66 "cd /home/dima/telegramBots/MuziatikBot && git pull && sudo systemctl restart muziatik_bot"
