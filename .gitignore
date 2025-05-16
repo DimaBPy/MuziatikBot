@@ -10,12 +10,8 @@ __pycache__/
 *.so
 
 # Distribution / packagin# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
 
 # C extensions
-*.so
 
 # Distribution / packaging
 .Python
@@ -328,3 +324,6 @@ fabric.properties
 
 .env
 .vscode/settings.json
+/.idea/misc.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml
