@@ -12,10 +12,15 @@ load_dotenv()
 
 # Helper function to send "..." before any message
 async def send_typing_indicator(chat_id, bot):
-    ellipsis = await bot.send_message(chat_id, "...")
+    dots = await bot.send_message(chat_id, "...")
     await asyncio.sleep(1)
-    await bot.delete_message(chat_id, ellipsis.message_id)
+    await bot.delete_message(chat_id, dots.message_id)
 
+
+def remember_name(name, user):
+    with open('storage.json', 'a+') as file:
+        for line in file:
+            file.write(f"'{user}': {name}")
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
 ])
@@ -44,15 +49,27 @@ mommy_chat_id = os.getenv("MOMMY_CHAT_ID")
 
 router = Router()
 
+name = None
+
 
 @router.message(Command('start'))
 async def start_bot(message: Message):
     await send_typing_indicator(message.chat.id, message.bot)
-    await message.answer("Здравствуйте, я **MuziatikBot**. Нажмите на _кнопку_ внизу, чтобы узнать больше обо мне.",
+    await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
+    await asyncio.sleep(1)
+    if name is None:
+        await message.answer('Давайте познакомимся!')
+    else:
+        await message.answer(f'О! Я вас помню! Вы {name}')
+    await message.answer("Нажмите на _кнопку_ внизу, чтобы узнать больше обо мне.",
                          parse_mode="Markdown",
                          reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='info')]],
                                                           resize_keyboard=True))
 
+
+@router.message(lambda msg: msg.text == 'Привет')
+async def hello(message: Message):
+    await message.reply('Привет!!!')
 
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
@@ -95,7 +112,7 @@ async def settings(message: Message):
 
 
 @router.callback_query(lambda c: c.data == 'name')
-async def name(callback_query: types.CallbackQuery, bot: Bot):
+async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
     await set.edit_text('Как вас называть?')
     await asyncio.sleep(1)
     await bot.edit_message_reply_markup(chat_id=set.chat.id,
@@ -110,6 +127,7 @@ async def name(callback_query: types.CallbackQuery, bot: Bot):
 @router.callback_query(lambda c: c.data == 'full_name')
 async def full_name(callback_query: types.CallbackQuery, bot: Bot):
     name = callback_query.from_user.full_name
+    remember_name(name, callback_query.from_user.id)
     await send_typing_indicator(callback_query.message.chat.id, bot)
     await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
 
