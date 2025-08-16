@@ -6,6 +6,8 @@ from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
+import json
+from typing import Optional
 
 load_dotenv()
 
@@ -17,10 +19,33 @@ async def send_typing_indicator(chat_id, bot):
     await bot.delete_message(chat_id, dots.message_id)
 
 
-def remember_name(name, user):
-    with open('storage.json', 'a+') as file:
-        for line in file:
-            file.write(f"'{user}': {name}")
+def remember_name(name: str, user_id: int) -> None:
+    # Persist names as JSON mapping {user_id: name}
+    import json, os
+    path = 'storage.json'
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f) or {}
+        except json.JSONDecodeError:
+            data = {}
+    data[str(user_id)] = name
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_remembered_name(user_id: int) -> Optional[str]:
+    try:
+        with open('storage.json', 'r', encoding='utf-8') as f:
+            data = json.load(f) or {}
+        return data.get(str(user_id))
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        return None
+
+
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
 ])
@@ -49,18 +74,17 @@ mommy_chat_id = os.getenv("MOMMY_CHAT_ID")
 
 router = Router()
 
-name = None
-
 
 @router.message(Command('start'))
 async def start_bot(message: Message):
     await send_typing_indicator(message.chat.id, message.bot)
     await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
     await asyncio.sleep(1)
-    if name is None:
+    user_name = get_remembered_name(message.from_user.id)
+    if not user_name:
         await message.answer('Давайте познакомимся!')
     else:
-        await message.answer(f'О! Я вас помню! Вы {name}')
+        await message.answer(f'О! Я вас помню! Вы {user_name}')
     await message.answer("Нажмите на _кнопку_ внизу, чтобы узнать больше обо мне.",
                          parse_mode="Markdown",
                          reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='info')]],
@@ -70,6 +94,7 @@ async def start_bot(message: Message):
 @router.message(lambda msg: msg.text == 'Привет')
 async def hello(message: Message):
     await message.reply('Привет!!!')
+
 
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
