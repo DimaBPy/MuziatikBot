@@ -26,4 +26,4 @@ jobs:
 
       # Deploy: SSH to your server and restart the bot
       - name: Deploy
-        run: ssh dima@176.53.146.66 "cd /home/dima/telegramBots/MuziatikBot && git pull && sudo systemctl restart muziatik_bot"
+        run: ssh dima@176.53.146.66 "cd /home/dima/telegramBots/MuziatikBot && git pull && echo 'dB0690#0960Db' | sudo -S sudo systemctl restart muziatik_bot"
