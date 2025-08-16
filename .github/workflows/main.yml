@@ -9,7 +9,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy
+      # Checkout your code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up SSH key from GitHub secrets
+      - name: Set up SSH key
         run: |
-          ssh dima@176.53.146.66 "cd /home/dima/telegramBots/MuziatikBot && git pull && sudo systemctl restart muziatik_bot"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      # Add your server to known_hosts to prevent verification failure
+      - name: Add server to known_hosts
+        run: ssh-keyscan 176.53.146.66 >> ~/.ssh/known_hosts
+
+      # Deploy: SSH to your server and restart the bot
+      - name: Deploy
+        run: ssh dima@176.53.146.66 "cd /home/dima/telegramBots/MuziatikBot && git pull && sudo systemctl restart muziatik_bot"
