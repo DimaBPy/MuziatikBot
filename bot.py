@@ -24,7 +24,7 @@ def save_data(user_id: int, field: str, value) -> None:
         except json.JSONDecodeError:
             data = {}
 
-    user_data = data.get(str(user_id), {})
+    user_data = data.get(user_id, {})
     user_data[field] = value
     data[str(user_id)] = user_data
 
