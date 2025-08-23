@@ -1,63 +1,14 @@
 import asyncio
 import os
 import random
-import json
-from typing import Optional
+
+from memory import *
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
-# ======== JSON Storage Helpers (int user_id) ========
-
-def save_data(user_id: int, field: str, value) -> None:
-    """Save or update a field for a specific user (nested dictionary)."""
-    path = 'storage.json'
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f) or {}
-        except json.JSONDecodeError:
-            data = {}
-
-    user_data = data.get(user_id, {})
-    user_data[field] = value
-    data[str(user_id)] = user_data
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def get_data(user_id: int, field: str) -> Optional[str]:
-    """Retrieve a field value by user ID from storage.json."""
-    try:
-        with open('storage.json', 'r', encoding='utf-8') as f:
-            data = json.load(f) or {}
-        return data.get(str(user_id), {}).get(field)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
-
-
-def delete_data(user_id: int, field: str = None) -> None:
-    """Delete a field or the entire user entry."""
-    path = 'storage.json'
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f) or {}
-        if str(user_id) in data:
-            if field:
-                data[str(user_id)].pop(field, None)
-            else:
-                del data[str(user_id)]
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
 
 # ======== Keyboards ========
 
@@ -69,14 +20,14 @@ dev_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Roll a die')],
     [KeyboardButton(text='info')],
     [KeyboardButton(text='Settings')],
+    [KeyboardButton(text='Feedback')],
     [KeyboardButton(text='Reminder (no)'), KeyboardButton(text='Cats! (later)')],
-    [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')],
-    [KeyboardButton(text='Feedback (need it)')]
+    [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')]
 ], resize_keyboard=True)
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
-    [KeyboardButton(text='info')],
+    [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
     [KeyboardButton(text='Настройки (beta)')],
 ], resize_keyboard=True)
 
@@ -84,15 +35,20 @@ keyboard = ReplyKeyboardMarkup(keyboard=[
 
 api_token_muziatikbot = os.getenv("API_TOKEN_muziatikBot")
 
+try:
+    MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
+except TypeError as e:
+    print(f'Ключа та нет... :\n{e}')
+
 router = Router()
-type_name = {}  # track users who are typing name manually
+keyboard_input = {}
 
 
 # ======== Helper ========
 
-async def send_typing_indicator(chat_id, bot):
+async def send_typing_indicator(chat_id, bot, wait=1):
     dots = await bot.send_message(chat_id, "...")
-    await asyncio.sleep(1)
+    await asyncio.sleep(wait)
     await bot.delete_message(chat_id, dots.message_id)
 
 
@@ -115,11 +71,6 @@ async def start_bot(message: Message):
     )
 
 
-@router.message(lambda msg: msg.text == 'Привет')
-async def hello(message: Message):
-    await message.reply('Привет!!!')
-
-
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
@@ -127,7 +78,11 @@ async def info(message: Message, bot: Bot):
     await asyncio.sleep(3)
     await message.reply(
         'Вот информация о MuziatikBot:\n'
-        'Версия — 1.6\nДоступность функций: Выбрать имя — предпросмотр, Возможности Bot_v1 — начальная стадия,\n Кубик — публичный предпросмотр.',
+        'Версия — 1.7.2\n'
+        'Доступность функций: Выбрать имя — предпросмотр,\n'
+        'Возможности Bot_v1 — добавление,\n'
+        'Кубик — полная функциональность.\n'
+        'Отзыв🆕: добавлено🎉 теперь вы можете оставить отзыв про бота',
         reply_markup=keyboard
     )
 
@@ -171,13 +126,13 @@ async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
         message_id=set.message_id,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='ФИ', callback_data='full_name'),
-             InlineKeyboardButton(text='имя пользователя', callback_data='username'),
-             InlineKeyboardButton(text='Ввести вручную', callback_data='type_name')],
+             InlineKeyboardButton(text='имя пользователя', callback_data='username')],
+            [InlineKeyboardButton(text='Ввести вручную', callback_data='keyboard_input')],
         ])
     )
 
 
-@router.callback_query(lambda c: c.data in ['full_name', 'username', 'type_name'])
+@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input'])
 async def set_name(callback_query: types.CallbackQuery, bot: Bot):
     if callback_query.data == 'full_name':
         name = callback_query.from_user.full_name
@@ -191,28 +146,46 @@ async def set_name(callback_query: types.CallbackQuery, bot: Bot):
         await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
     else:
         await send_typing_indicator(callback_query.message.chat.id, bot)
-        type_name[callback_query.from_user.id] = True
+        keyboard_input[callback_query.from_user.id] = 'name'
         await bot.send_message(callback_query.message.chat.id, f'Хорошо, пишите')
 
 
 @router.message(lambda msg: msg.text == 'dev')
 async def dev(message: Message):
-    await send_typing_indicator(message.chat.id, message.bot)
-    await message.reply('Okei-dokei', reply_markup=dev_keyboard)
+    await send_typing_indicator(message.chat.id, message.bot, wait=2)
+    await message.reply('Проверяю')
+    await send_typing_indicator(message.chat.id, message.bot, wait=3)
+    if message.from_user.id == MY_CHAT_ID or message.from_user.id == os.getenv('DADDY_CHAT_ID'):
+        await message.reply('Okei-dokei', reply_markup=dev_keyboard)
+    else:
+        await message.reply('Вы не разработчик')
 
 
-@router.message(lambda msg: msg.text and ('Отзыв' in msg.text or 'Feedback' in msg.text))
+@router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
+    global keyboard_input
+    keyboard_input[message.from_user.id] = 'feedback'
     await send_typing_indicator(message.chat.id, message.bot)
-    await message.reply('_Напишите_ Ваш отзыв (функция не работает)', parse_mode="Markdown")
+    await message.reply('_Напишите_ Ваш отзыв (бета версия)', parse_mode="Markdown")
 
 
 @router.message()
-async def everything(message: Message):
-    if type_name.get(message.from_user.id):
+async def everything(message: Message, bot: Bot):
+    if keyboard_input.get(message.from_user.id) == 'name':
         save_data(message.from_user.id, "name", message.text)
-        del type_name[message.from_user.id]
+        del keyboard_input[message.from_user.id]
         await message.answer(f'Запомнил! Теперь вы — {message.text}')
+    elif keyboard_input.get(message.from_user.id) == 'feedback':
+        await message.answer('Пишу моему создателю')
+        await send_typing_indicator(message.from_user.id, bot)
+        await bot.send_message(MY_CHAT_ID, f'Эй, бро у тебя отзыв.\n{message.text}')
+        await message.reply('Написал')
+        await send_typing_indicator(message.from_user.id, bot)
+        await message.answer('Кстати, скоро у отзывов будут свои идентификаторы🔜')
+        del keyboard_input[message.from_user.id]
+    else:
+        await message.reply(
+            'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите 4 квадрата слева от скрепки')
 
 
 # ======== Main ========
