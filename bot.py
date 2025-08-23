@@ -34,7 +34,11 @@ keyboard = ReplyKeyboardMarkup(keyboard=[
 # ======== Config ========
 
 api_token_muziatikbot = os.getenv("API_TOKEN_muziatikBot")
-MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
+
+try:
+    MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
+except TypeError as e:
+    print(f'Ключа та нет... :\n{e}')
 
 router = Router()
 keyboard_input = {}
