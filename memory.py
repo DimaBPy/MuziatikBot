@@ -7,28 +7,35 @@ from typing import Optional
 def save_data(user_id: int, field: str, value) -> None:
     """Save or update a field for a specific user (nested dictionary)."""
     path = 'storage.json'
-    data = {}
     if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f) or {}
-        except json.JSONDecodeError:
-            data = {}
+        with open(path, 'r+', encoding='utf-8') as f:
+            try:
+                data = json.load(f)  # Load existing data
+            except json.JSONDecodeError:
+                # If file is empty or invalid, initialize to empty dict
+                data = {}
 
-    user_data = data.get(user_id, {})
-    user_data[field] = value
-    data[str(user_id)] = user_data
+            user_data = data.get(str(user_id), {})  # Fix: user_id should be a string
+            user_data[field] = value.lower() if isinstance(value, str) else value
+            data[str(user_id)] = user_data
+            # Move the file pointer to the start before writing
+            f.seek(0)
+            f.truncate()
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    else:
+        # If a file doesn't exist, create a new one
+        with open(path, 'w', encoding='utf-8') as f:
+            data = {str(user_id): {field: value.lower() if isinstance(value, str) else value}}
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-def get_data(user_id: int, field: str) -> Optional[str]:
+def get_data(user_id: int, field: str = None) -> Optional[str]:
     """Retrieve a field value by user ID from storage.json."""
     try:
         with open('storage.json', 'r', encoding='utf-8') as f:
             data = json.load(f) or {}
-        return data.get(str(user_id), {}).get(field)
+        user_data = data.get(str(user_id), {})
+        return user_data.get(field) if field else user_data
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
