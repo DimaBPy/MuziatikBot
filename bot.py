@@ -1,8 +1,8 @@
 import asyncio
 import os
 import random
-import json
-from typing import Optional
+
+from memory import get_data, save_data, delete_data
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,89 +10,48 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-# ======== JSON Storage Helpers (int user_id) ========
-
-def save_data(user_id: int, field: str, value) -> None:
-    """Save or update a field for a specific user (nested dictionary)."""
-    path = 'storage.json'
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f) or {}
-        except json.JSONDecodeError:
-            data = {}
-
-    user_data = data.get(user_id, {})
-    user_data[field] = value
-    data[str(user_id)] = user_data
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def get_data(user_id: int, field: str) -> Optional[str]:
-    """Retrieve a field value by user ID from storage.json."""
-    try:
-        with open('storage.json', 'r', encoding='utf-8') as f:
-            data = json.load(f) or {}
-        return data.get(str(user_id), {}).get(field)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
-
-
-def delete_data(user_id: int, field: str = None) -> None:
-    """Delete a field or the entire user entry."""
-    path = 'storage.json'
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f) or {}
-        if str(user_id) in data:
-            if field:
-                data[str(user_id)].pop(field, None)
-            else:
-                del data[str(user_id)]
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
-
 # ======== Keyboards ========
 
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
+    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
+    [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
+    [InlineKeyboardButton(text='Вспомнить', callback_data='recall')],
+    [InlineKeyboardButton(text='Забыть', callback_data='forget')]
 ])
 
 dev_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Roll a die')],
     [KeyboardButton(text='info')],
     [KeyboardButton(text='Settings')],
+    [KeyboardButton(text='Feedback')],
     [KeyboardButton(text='Reminder (no)'), KeyboardButton(text='Cats! (later)')],
-    [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')],
-    [KeyboardButton(text='Feedback (need it)')]
+    [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')]
 ], resize_keyboard=True)
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
-    [KeyboardButton(text='info')],
-    [KeyboardButton(text='Настройки (beta)')],
+    [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
+    [KeyboardButton(text='Настройки')],
 ], resize_keyboard=True)
 
 # ======== Config ========
 
 api_token_muziatikbot = os.getenv("API_TOKEN_muziatikBot")
 
+try:
+    MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
+except TypeError as e:
+    print(f'Ключа та нет... :\n{e}')
+
 router = Router()
-type_name = {}  # track users who are typing name manually
+keyboard_input = {}
 
 
 # ======== Helper ========
 
-async def send_typing_indicator(chat_id, bot):
+async def send_typing_indicator(chat_id, bot, wait=1):
     dots = await bot.send_message(chat_id, "...")
-    await asyncio.sleep(1)
+    await asyncio.sleep(wait)
     await bot.delete_message(chat_id, dots.message_id)
 
 
@@ -115,20 +74,23 @@ async def start_bot(message: Message):
     )
 
 
-@router.message(lambda msg: msg.text == 'Привет')
-async def hello(message: Message):
-    await message.reply('Привет!!!')
-
-
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA')
     await asyncio.sleep(3)
     await message.reply(
-        'Вот информация о MuziatikBot:\n'
-        'Версия — 1.6\nДоступность функций: Выбрать имя — предпросмотр, Возможности Bot_v1 — начальная стадия,\n Кубик — публичный предпросмотр.',
-        reply_markup=keyboard
+        # Prefetch the user's name off the event loop, with a fallback
+        name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
+        await message.reply(
+            f"Вот информация о MuziatikBot, {name}:\n"
+            "Версия — 2.0🆕🎉😎\n"
+            "Доступность функций: Выбрать имя — Полная функциональность,\n"
+            "Кубик — полная функциональность.\n"
+            "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
+            "Память🧠: Публичный предпросмотр",
+            reply_markup=keyboard
+        )
     )
 
 
@@ -146,6 +108,8 @@ async def dice(message: Message, bot: Bot):
 @router.callback_query(lambda c: c.data == 'roll_dice')
 async def roll_dice(callback_query: types.CallbackQuery, bot: Bot):
     await bot.send_dice(callback_query.from_user.id)
+    await asyncio.sleep(4)
+    await callback_query.answer()
 
 
 @router.callback_query(lambda c: c.data == "text_dice")
@@ -153,66 +117,133 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
     dice_result = random.randint(1, 6)
     await send_typing_indicator(callback_query.from_user.id, bot)
     await bot.send_message(callback_query.from_user.id, f"Выпало: {dice_result}")
+    await callback_query.answer(f"Выпало: {dice_result}", show_alert=True)
 
 
-@router.message(lambda msg: msg.text in ['Настройки (beta)', 'Settings'])
+@router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
-    global set
-    set = await message.reply('Вот _beta_ настройки', reply_markup=settings_keyboard,
-                              parse_mode="Markdown")
+    await message.reply('Вот настройки', reply_markup=settings_keyboard,
+                               parse_mode="Markdown")
 
 
 @router.callback_query(lambda c: c.data == 'name')
 async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
-    await set.edit_text('Как вас называть?')
+    await callback_query.message.edit_text('Как вас называть?')
+    await callback_query.answer()
     await asyncio.sleep(1)
     await bot.edit_message_reply_markup(
-        chat_id=set.chat.id,
-        message_id=set.message_id,
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='ФИ', callback_data='full_name'),
-             InlineKeyboardButton(text='имя пользователя', callback_data='username'),
-             InlineKeyboardButton(text='Ввести вручную', callback_data='type_name')],
+             InlineKeyboardButton(text='имя пользователя', callback_data='username')],
+            [InlineKeyboardButton(text='Ввести вручную', callback_data='keyboard_input')],
         ])
     )
 
 
-@router.callback_query(lambda c: c.data in ['full_name', 'username', 'type_name'])
+@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input'])
 async def set_name(callback_query: types.CallbackQuery, bot: Bot):
     if callback_query.data == 'full_name':
         name = callback_query.from_user.full_name
         save_data(callback_query.from_user.id, "name", name)
-        await send_typing_indicator(callback_query.message.chat.id, bot)
-        await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
+        await callback_query.answer(f'Хорошо, {name}')
+        # await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
     elif callback_query.data == 'username':
         name = callback_query.from_user.username
         save_data(callback_query.from_user.id, "name", name)
-        await send_typing_indicator(callback_query.message.chat.id, bot)
-        await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
+        await callback_query.answer(f'Хорошо, {name}')
+        # await bot.send_message(callback_query.message.chat.id, f'Хорошо, {name}')
     else:
         await send_typing_indicator(callback_query.message.chat.id, bot)
-        type_name[callback_query.from_user.id] = True
-        await bot.send_message(callback_query.message.chat.id, f'Хорошо, пишите')
+        keyboard_input[callback_query.from_user.id] = 'name'
+        await callback_query.answer('Хорошо, пишите', show_alert=True)
+        # await bot.send_message(callback_query.message.chat.id, 'Хорошо, пишите')
+
+
+@router.callback_query(lambda c: c.data == 'remember' or c.data == 'recall' or c.data == 'forget')
+async def memory(callback_query: types.CallbackQuery):
+    if callback_query.data == 'remember':
+        await callback_query.answer('Правила: Ключ писать без пробелов, затем пробел и значение без пробелов',
+                                    show_alert=True)
+        keyboard_input[callback_query.from_user.id] = 'remember'
+        await callback_query.message.answer('Пример:\nцвет голубой'
+                                            '\nпокупки голубика_клубника_помидоры')
+
+    elif callback_query.data == 'recall':
+        await callback_query.answer('Вспоминаю...')
+        asyncio.create_task(send_typing_indicator(callback_query.message.chat.id, callback_query.bot))
+        await callback_query.message.answer(
+            '\n'.join(f'{"Имя" if key == "name" else key}: {value}' for key, value in
+                      get_data(callback_query.from_user.id).items()))
+
+    else:
+        keyboard_input[callback_query.from_user.id] = 'forget'
+        await callback_query.answer('Хорошо')
+        await callback_query.message.answer('Напишите ключ объекта, который хотите удалить')
+        await callback_query.message.answer('Или напишите "Всё"')
+        await send_typing_indicator(callback_query.message.chat.id, callback_query.bot, wait=3)
+        await callback_query.message.answer('А если вы забыли ключ, нажмите на кнопку "Вспомнить"')
 
 
 @router.message(lambda msg: msg.text == 'dev')
 async def dev(message: Message):
-    await send_typing_indicator(message.chat.id, message.bot)
-    await message.reply('Okei-dokei', reply_markup=dev_keyboard)
+    await send_typing_indicator(message.chat.id, message.bot, wait=2)
+    await message.reply('Проверяю')
+    await send_typing_indicator(message.chat.id, message.bot, wait=3)
+    if message.from_user.id == MY_CHAT_ID or message.from_user.id == os.getenv('DADDY_CHAT_ID'):
+        await message.reply('Okei-dokei', reply_markup=dev_keyboard)
+    else:
+        await message.reply('Вы не разработчик')
 
 
-@router.message(lambda msg: msg.text and ('Отзыв' in msg.text or 'Feedback' in msg.text))
+@router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
+    global keyboard_input
+    keyboard_input[message.from_user.id] = 'feedback'
     await send_typing_indicator(message.chat.id, message.bot)
-    await message.reply('_Напишите_ Ваш отзыв (функция не работает)', parse_mode="Markdown")
+    await message.reply('_Напишите_ Ваш отзыв (бета версия)', parse_mode="Markdown")
 
 
 @router.message()
-async def everything(message: Message):
-    if type_name.get(message.from_user.id):
+async def everything(message: Message, bot: Bot):
+    if keyboard_input.get(message.from_user.id) == 'name':
         save_data(message.from_user.id, "name", message.text)
-        del type_name[message.from_user.id]
+        del keyboard_input[message.from_user.id]
         await message.answer(f'Запомнил! Теперь вы — {message.text}')
+    elif keyboard_input.get(message.from_user.id) == 'feedback':
+        await message.answer('Пишу моему создателю')
+        await send_typing_indicator(message.from_user.id, bot)
+        await bot.send_message(MY_CHAT_ID, f'Эй, бро у тебя отзыв.\n{message.text}')
+        await message.reply('Написал')
+        await send_typing_indicator(message.from_user.id, bot)
+        await message.answer('Кстати, скоро у отзывов будут свои идентификаторы🔜')
+        del keyboard_input[message.from_user.id]
+    elif keyboard_input.get(message.from_user.id) == 'remember':
+        asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
+        if len(message.text.split()) == 2:
+            save_data(message.from_user.id, message.text.split()[0], message.text.split()[1])
+            await message.answer(f'Запомнил!\n'
+                                 f'{message.text.split()[0]} — {message.text.split()[1]}')
+        else:
+            await message.answer('Пожалуйста, введите ровно два слова через пробел')
+        del keyboard_input[message.from_user.id]
+    elif keyboard_input.get(message.from_user.id) == 'forget':
+        asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=2))
+        del keyboard_input[message.from_user.id]
+        if message.text.lower() == 'всё' or message.text.lower() == 'все':
+            delete_data(message.from_user.id)
+            await message.reply('Удалил вас из базы🥸')
+            return
+        if message.text.lower() not in get_data(message.from_user.id):
+            await message.answer('Такого ключа нет')
+            return
+        delete_data(message.from_user.id, message.text)
+        await message.answer(f'Удалил ключ {message.text} и его значение')
+
+    else:
+        await message.reply(
+            'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите 4 квадрата слева от скрепки')
 
 
 # ======== Main ========
