@@ -122,19 +122,18 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
 
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
-    global sett
-    sett = await message.reply('Вот настройки', reply_markup=settings_keyboard,
+    await message.reply('Вот настройки', reply_markup=settings_keyboard,
                                parse_mode="Markdown")
 
 
 @router.callback_query(lambda c: c.data == 'name')
 async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
-    await sett.edit_text('Как вас называть?')
+    await callback_query.message.edit_text('Как вас называть?')
     await callback_query.answer()
     await asyncio.sleep(1)
     await bot.edit_message_reply_markup(
-        chat_id=sett.chat.id,
-        message_id=sett.message_id,
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='ФИ', callback_data='full_name'),
              InlineKeyboardButton(text='имя пользователя', callback_data='username')],
