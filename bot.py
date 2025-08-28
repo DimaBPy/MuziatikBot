@@ -2,7 +2,7 @@ import asyncio
 import os
 import random
 
-from memory import *
+from memory import get_data, save_data, delete_data
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
