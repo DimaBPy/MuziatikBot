@@ -79,18 +79,16 @@ async def info(message: Message, bot: Bot):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA')
     await asyncio.sleep(3)
+    # Prefetch the user's name off the event loop, with a fallback
+    name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
-        # Prefetch the user's name off the event loop, with a fallback
-        name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
-        await message.reply(
-            f"Вот информация о MuziatikBot, {name}:\n"
-            "Версия — 2.0🆕🎉😎\n"
-            "Доступность функций: Выбрать имя — Полная функциональность,\n"
-            "Кубик — полная функциональность.\n"
-            "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
-            "Память🧠: Публичный предпросмотр",
-            reply_markup=keyboard
-        )
+        f"Вот информация о MuziatikBot, {name}:\n"
+        "Версия — 2.0🆕🎉😎\n"
+        "Доступность функций: Выбрать имя — Полная функциональность,\n"
+        "Кубик — полная функциональность.\n"
+        "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
+        "Память🧠: Публичный предпросмотр",
+        reply_markup=keyboard
     )
 
 
@@ -123,7 +121,7 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
     await message.reply('Вот настройки', reply_markup=settings_keyboard,
-                               parse_mode="Markdown")
+                        parse_mode="Markdown")
 
 
 @router.callback_query(lambda c: c.data == 'name')
