@@ -16,7 +16,7 @@ def save_data(user_id: int, field: str, value) -> None:
                 data = {}
 
             user_data = data.get(str(user_id), {})  # Fix: user_id should be a string
-            user_data[field] = value.lower() if isinstance(value, str) else value
+            user_data[field.lower()] = value.lower() if isinstance(value, str) else value
             data[str(user_id)] = user_data
             # Move the file pointer to the start before writing
             f.seek(0)
@@ -25,7 +25,7 @@ def save_data(user_id: int, field: str, value) -> None:
     else:
         # If a file doesn't exist, create a new one
         with open(path, 'w', encoding='utf-8') as f:
-            data = {str(user_id): {field: value.lower() if isinstance(value, str) else value}}
+            data = {str(user_id): {field.lower(): value.lower() if isinstance(value, str) else value}}
             json.dump(data, f, ensure_ascii=False, indent=2)
 
 
@@ -35,7 +35,7 @@ def get_data(user_id: int, field: str = None) -> Optional[str]:
         with open('storage.json', 'r', encoding='utf-8') as f:
             data = json.load(f) or {}
         user_data = data.get(str(user_id), {})
-        return user_data.get(field) if field else user_data
+        return user_data.get(field.lower() if field else None) if field else user_data
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
@@ -48,7 +48,7 @@ def delete_data(user_id: int, field: str = None) -> None:
             data = json.load(f) or {}
         if str(user_id) in data:
             if field:
-                data[str(user_id)].pop(field, None)
+                data[str(user_id)].pop(field.lower(), None)
             else:
                 del data[str(user_id)]
         with open(path, 'w', encoding='utf-8') as f:
