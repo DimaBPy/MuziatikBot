@@ -10,6 +10,13 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 import speech_recognition as sr
 
+
+def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
+    r = sr.Recognizer()
+    with sr.AudioFile(path) as source:
+        audio_data = r.record(source)
+    return r.recognize_google(audio_data, language=language)
+
 load_dotenv()
 
 # ======== Keyboards ========
@@ -223,14 +230,12 @@ async def voice_to_text(message: types.Message, bot: Bot):
         await bot.download_file(voice_file.file_path, ogg_path)
         # Конвертируем из OGG в WAV, так как SpeechRecognition лучше работает с WAV
         wav_path = ogg_path.replace('.ogg', '.wav')
-        AudioSegment.from_file(ogg_path).export(wav_path, format="wav")
+        segment = await asyncio.to_thread(AudioSegment.from_file, ogg_path)
+        await asyncio.to_thread(segment.export, wav_path, format="wav")
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=5))
         transcribe = await message.answer('Расшифровываю...')
         # Расшифровываем аудио
-        r = sr.Recognizer()
-        with sr.AudioFile(wav_path) as source:
-            audio_data = r.record(source)
-            text = r.recognize_google(audio_data, language='ru-RU')
+        text = await asyncio.to_thread(_transcribe_wav, wav_path)
         # Отправляем расшифрованный текст
         await message.reply(f"Расшифрованный текст: {text}")
 
