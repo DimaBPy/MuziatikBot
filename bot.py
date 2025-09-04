@@ -3,10 +3,12 @@ import os
 import random
 
 from memory import get_data, save_data, delete_data
-from aiogram import Bot, Dispatcher, Router, types
+from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
+from pydub import AudioSegment
+import speech_recognition as sr
 
 load_dotenv()
 
@@ -83,16 +85,21 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.0🆕🎉😎\n"
-        "Доступность функций: Выбрать имя — Полная функциональность,\n"
+        "Версия — 2.1\n"
+        "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
+        "Полезные функции выделены *жирным шрифтом*\n"
+        "Вот мои функции:\n"
+        "Выбрать имя — Полная функциональность,\n"
         "Кубик — полная функциональность.\n"
         "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
-        "Память🧠: Публичный предпросмотр",
-        reply_markup=keyboard
+        "*Память*🧠: *Публичный предпросмотр*\n"
+        "*Расшифровка голосовых сообщений в текст*:\n"
+        "Просто отправьте или перешлите голосовое сообщение и я его расшифрую",
+        parse_mode='Markdown', reply_markup=keyboard
     )
 
 
-@router.message(lambda msg: "Кубик" in msg.text or 'die' in msg.text)
+@router.message(lambda msg: msg.text == "Кубик" or msg.text == 'Roll a die')
 async def dice(message: Message, bot: Bot):
     inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
@@ -203,6 +210,44 @@ async def feedback(message: Message):
     await message.reply('_Напишите_ Ваш отзыв (бета версия)', parse_mode="Markdown")
 
 
+@router.message(F.voice)
+async def voice_to_text(message: types.Message, bot: Bot):
+    """
+    Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
+    """
+    try:
+        # Скачиваем голосовое сообщение
+        voice_file = await bot.get_file(message.voice.file_id)
+        ogg_path = f"voice_{voice_file.file_id}.ogg"
+        download = await message.reply('Скачиваю сообщение')
+        await bot.download_file(voice_file.file_path, ogg_path)
+        # Конвертируем из OGG в WAV, так как SpeechRecognition лучше работает с WAV
+        wav_path = ogg_path.replace('.ogg', '.wav')
+        AudioSegment.from_file(ogg_path).export(wav_path, format="wav")
+        asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=5))
+        transcribe = await message.answer('Расшифровываю...')
+        # Расшифровываем аудио
+        r = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            audio_data = r.record(source)
+            text = r.recognize_google(audio_data, language='ru-RU')
+        # Отправляем расшифрованный текст
+        await message.reply(f"Расшифрованный текст: {text}")
+
+    except sr.UnknownValueError:
+        await message.reply("Не удалось распознать речь.")
+    except Exception as e:
+        await message.reply(f"Произошла ошибка: {e}")
+    finally:
+        await download.delete()
+        await transcribe.delete()
+        # Удаляем временные файлы
+        if os.path.exists(ogg_path):
+            os.remove(ogg_path)
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+
+
 @router.message()
 async def everything(message: Message, bot: Bot):
     if keyboard_input.get(message.from_user.id) == 'name':
@@ -238,7 +283,6 @@ async def everything(message: Message, bot: Bot):
             return
         delete_data(message.from_user.id, message.text)
         await message.answer(f'Удалил ключ {message.text} и его значение')
-
     else:
         await message.reply(
             'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите 4 квадрата слева от скрепки')
