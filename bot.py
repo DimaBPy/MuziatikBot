@@ -5,7 +5,8 @@ import random
 from memory import get_data, save_data, delete_data
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
+    InlineQueryResultArticle, InputTextMessageContent
 from dotenv import load_dotenv
 from pydub import AudioSegment
 import speech_recognition as sr
@@ -16,6 +17,7 @@ def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
     with sr.AudioFile(path) as source:
         audio_data = r.record(source)
     return r.recognize_google(audio_data, language=language)
+
 
 load_dotenv()
 
@@ -92,7 +94,7 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.1\n"
+        "Версия — 2.2\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
         "Полезные функции выделены *жирным шрифтом*\n"
         "Вот мои функции:\n"
@@ -101,7 +103,8 @@ async def info(message: Message, bot: Bot):
         "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
         "*Память*🧠: *Публичный предпросмотр*\n"
         "*Расшифровка голосовых сообщений в текст*:\n"
-        "Просто отправьте или перешлите голосовое сообщение и я его расшифрую",
+        "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n\n"
+        "Напишите @muziatikBot в любом другом чате чтобы отправить интерактивный эмодзи",
         parse_mode='Markdown', reply_markup=keyboard
     )
 
@@ -251,6 +254,45 @@ async def voice_to_text(message: types.Message, bot: Bot):
             os.remove(ogg_path)
         if os.path.exists(wav_path):
             os.remove(wav_path)
+
+
+@router.inline_query()
+async def inline_emojis(inline_query: types.InlineQuery, bot: Bot):
+    # Создаём список всех интерактивных эмодзи
+    results = [
+        InlineQueryResultArticle(
+            id='1',
+            title='🎲 Кубик',
+            input_message_content=InputTextMessageContent(message_text='🎲')
+        ),
+        InlineQueryResultArticle(
+            id='2',
+            title='🎯 Дартс',
+            input_message_content=InputTextMessageContent(message_text='🎯')
+        ),
+        InlineQueryResultArticle(
+            id='3',
+            title='🏀 Баскетбол',
+            input_message_content=InputTextMessageContent(message_text='🏀')
+        ),
+        InlineQueryResultArticle(
+            id='4',
+            title='🎳 Боулинг',
+            input_message_content=InputTextMessageContent(message_text='🎳')
+        ),
+        InlineQueryResultArticle(
+            id='5',
+            title='⚽ Футбол',
+            input_message_content=InputTextMessageContent(message_text='⚽')
+        ),
+        InlineQueryResultArticle(
+            id='6',
+            title='🎰 Слоты',
+            input_message_content=InputTextMessageContent(message_text='🎰')
+        )
+    ]
+    # Отправляем результаты пользователю
+    await inline_query.answer(results)
 
 
 @router.message()
