@@ -142,9 +142,8 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
 
 
 @router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
-async def memory(message: Message):
-    await message.reply('Выберете действие с памятью', reply_markup=memory_keyboard)
-
+async def memory_menu(message: Message):
+    await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
 
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
