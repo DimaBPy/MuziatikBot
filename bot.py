@@ -25,16 +25,18 @@ load_dotenv()
 # ======== Keyboards ========
 
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
+    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
+])
+memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
     [InlineKeyboardButton(text='Вспомнить', callback_data='recall')],
     [InlineKeyboardButton(text='Забыть', callback_data='forget')]
 ])
-
 dev_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Roll a die')],
     [KeyboardButton(text='info')],
     [KeyboardButton(text='Settings')],
+    [KeyboardButton(text='Memory')],
     [KeyboardButton(text='Feedback')],
     [KeyboardButton(text='Reminder (no)'), KeyboardButton(text='Cats! (later)')],
     [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')]
@@ -43,6 +45,7 @@ dev_keyboard = ReplyKeyboardMarkup(keyboard=[
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
     [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
+    [KeyboardButton(text='Память')],
     [KeyboardButton(text='Настройки')],
 ], resize_keyboard=True)
 
@@ -95,7 +98,7 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.2\n"
+        "Версия — 2.4.1\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
         "Полезные функции выделены *жирным шрифтом*\n"
         "Вот мои функции:\n"
@@ -104,7 +107,9 @@ async def info(message: Message, bot: Bot):
         "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
         "*Память*🧠: *Публичный предпросмотр*\n"
         "*Расшифровка голосовых сообщений в текст*:\n"
-        "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n\n"
+        "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n"
+        "Бесплатно 10 голосовых сообщений в неделю, "
+        "далее 5 звёзд за сообщение\n\n"
         "Напишите @muziatikBot в любом другом чате чтобы отправить интерактивный эмодзи",
         parse_mode='Markdown', reply_markup=keyboard
     )
@@ -135,6 +140,10 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
     await bot.send_message(callback_query.from_user.id, f"Выпало: {dice_result}")
     await callback_query.answer(f"Выпало: {dice_result}", show_alert=True)
 
+
+@router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
+async def memory_menu(message: Message):
+    await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
 
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
@@ -211,8 +220,6 @@ async def dev(message: Message):
         await message.reply('Okei-dokei', reply_markup=dev_keyboard)
     else:
         await message.reply('Вы не разработчик')
-        await message.reply_invoice('Pay to use', 'You are not a dev',
-                                    'dev', 'XTR', [LabeledPrice(label='dev', amount=1)])
 
 
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
@@ -345,8 +352,6 @@ async def inline_emojis(inline_query: types.InlineQuery):
     ]
     # Отправляем результаты пользователю
     await inline_query.answer(results)
-
-
 
 
 # ======== Main ========
