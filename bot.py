@@ -309,7 +309,7 @@ async def voice_to_text(message: types.Message, bot: Bot):
 
 
 @router.inline_query()
-async def inline_emojis(inline_query: types.InlineQuery, bot: Bot):
+async def inline_emojis(inline_query: types.InlineQuery):
     # Создаём список всех интерактивных эмодзи
     results = [
         InlineQueryResultArticle(
