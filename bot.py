@@ -98,7 +98,7 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.4\n"
+        "Версия — 2.4.1\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
         "Полезные функции выделены *жирным шрифтом*\n"
         "Вот мои функции:\n"
@@ -221,8 +221,6 @@ async def dev(message: Message):
         await message.reply('Okei-dokei', reply_markup=dev_keyboard)
     else:
         await message.reply('Вы не разработчик')
-        await message.reply_invoice('Pay to use', 'You are not a dev',
-                                    'dev', 'XTR', [LabeledPrice(label='dev', amount=1)])
 
 
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
