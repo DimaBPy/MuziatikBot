@@ -1,12 +1,13 @@
 import asyncio
 import os
 import random
+import time
 
 from memory import get_data, save_data, delete_data
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
-    InlineQueryResultArticle, InputTextMessageContent
+    InlineQueryResultArticle, InputTextMessageContent, LabeledPrice
 from dotenv import load_dotenv
 from pydub import AudioSegment
 import speech_recognition as sr
@@ -210,6 +211,8 @@ async def dev(message: Message):
         await message.reply('Okei-dokei', reply_markup=dev_keyboard)
     else:
         await message.reply('Вы не разработчик')
+        await message.reply_invoice('Pay to use', 'You are not a dev',
+                                    'dev', 'XTR', [LabeledPrice(label='dev', amount=1)])
 
 
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
@@ -224,8 +227,47 @@ async def feedback(message: Message):
 async def voice_to_text(message: types.Message, bot: Bot):
     """
     Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
+    Добавлен недельный лимит: 10 бесплатных расшифровок на пользователя.
+    При превышении отправляется счёт на 5 Stars, а расшифровка не выполняется.
     """
+    download = None
+    transcribe = None
+    ogg_path = None
+    wav_path = None
     try:
+        # Проверяем и обновляем недельный лимит
+        user_id = message.from_user.id
+        now = int(time.time())
+        week_seconds = 7 * 24 * 60 * 60
+
+        # Инициализация недели, если не задана
+        start_ts = get_data(user_id, "voice_week_start_ts")
+        if not isinstance(start_ts, int):
+            start_ts = now
+            save_data(user_id, "voice_week_start_ts", start_ts)
+
+        # Сброс счётчика, если прошла неделя
+        if now - start_ts >= week_seconds:
+            save_data(user_id, "voice_counter", 0)
+            start_ts = now
+            save_data(user_id, "voice_week_start_ts", start_ts)
+
+        counter = get_data(user_id, "voice_counter")
+        if not isinstance(counter, int):
+            counter = 0
+            save_data(user_id, "voice_counter", counter)
+
+        # Если лимит исчерпан — отправляем счёт и выходим
+        if counter >= 10:
+            await message.reply_invoice(
+                title="Лимит расшифровок",
+                description="Вы использовали 10 бесплатных расшифровок на этой неделе. Купите доступ за 5 Звёзд.",
+                payload=f"voice_limit_5_stars:{message.voice.file_id}",
+                currency="XTR",
+                prices=[LabeledPrice(label="Voice transcription", amount=1)]
+            )
+            return
+
         # Скачиваем голосовое сообщение
         voice_file = await bot.get_file(message.voice.file_id)
         ogg_path = f"voice_{voice_file.file_id}.ogg"
@@ -241,18 +283,28 @@ async def voice_to_text(message: types.Message, bot: Bot):
         text = await asyncio.to_thread(_transcribe_wav, wav_path)
         # Отправляем расшифрованный текст
         await message.reply(f"Расшифрованный текст: {text}")
+        # Увеличиваем счётчик после успешной расшифровки
+        save_data(user_id, "voice_counter", counter + 1)
 
     except sr.UnknownValueError:
         await message.reply("Не удалось распознать речь.")
     except Exception as e:
         await message.reply(f"Произошла ошибка: {e}")
     finally:
-        await download.delete()
-        await transcribe.delete()
+        try:
+            if download:
+                await download.delete()
+        except Exception:
+            pass
+        try:
+            if transcribe:
+                await transcribe.delete()
+        except Exception:
+            pass
         # Удаляем временные файлы
-        if os.path.exists(ogg_path):
+        if ogg_path and os.path.exists(ogg_path):
             os.remove(ogg_path)
-        if os.path.exists(wav_path):
+        if wav_path and os.path.exists(wav_path):
             os.remove(wav_path)
 
 
@@ -295,6 +347,110 @@ async def inline_emojis(inline_query: types.InlineQuery, bot: Bot):
     await inline_query.answer(results)
 
 
+
+
+# ======== Main ========
+
+async def main():
+    bot = Bot(api_token_muziatikbot)
+    dp = Dispatcher()
+    dp.include_router(router)
+    await dp.start_polling(bot)
+
+
+# ======== Payments Handlers ========
+
+@router.pre_checkout_query()
+async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: Bot):
+    try:
+        await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+    except Exception:
+        try:
+            await bot.answer_pre_checkout_query(
+                pre_checkout_query.id,
+                ok=False,
+                error_message="Не удалось обработать оплату. Попробуйте позже.")
+        except Exception:
+            pass
+
+
+@router.message(F.successful_payment)
+async def successful_payment_handler(message: types.Message, bot: Bot):
+    payload = (message.successful_payment.invoice_payload or "")
+    if not payload.startswith("voice_limit_5_stars:"):
+        return
+
+    async def refund_and_notify(reason: str):
+        # Try to refund Stars and notify the user
+        charge_id = None
+        try:
+            charge_id = message.successful_payment.telegram_payment_charge_id
+        except Exception:
+            pass
+        if charge_id:
+            try:
+                await bot.refund_star_payment(
+                    user_id=message.from_user.id,
+                    telegram_payment_charge_id=charge_id
+                )
+                await message.answer(f"{reason}\nСредства возвращены.")
+            except Exception as e:
+                await message.answer(
+                    f"{reason}\nНе удалось автоматически вернуть средства. Свяжитесь с поддержкой. Ошибка: {e}")
+        else:
+            await message.answer(
+                f"{reason}\nНе найден идентификатор платежа для возврата. Свяжитесь с поддержкой.")
+
+    voice_file_id = payload.split(":", 1)[1].strip() if ":" in payload else ""
+    if not voice_file_id:
+        await refund_and_notify("Не удалось определить, какое сообщение расшифровать после оплаты.")
+        return
+
+    download = None
+    transcribe_msg = None
+    ogg_path = None
+    wav_path = None
+    try:
+        # Скачиваем голосовое сообщение по file_id из payload
+        voice_file = await bot.get_file(voice_file_id)
+        ogg_path = f"voice_{voice_file.file_id}.ogg"
+        download = await message.reply('Скачиваю оплаченный голос')
+        await bot.download_file(voice_file.file_path, ogg_path)
+
+        # Конвертируем OGG в WAV
+        wav_path = ogg_path.replace('.ogg', '.wav')
+        segment = await asyncio.to_thread(AudioSegment.from_file, ogg_path)
+        await asyncio.to_thread(segment.export, wav_path, format="wav")
+
+        asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=5))
+        transcribe_msg = await message.answer('Расшифровываю (оплачено)...')
+
+        # Расшифровываем
+        text = await asyncio.to_thread(_transcribe_wav, wav_path)
+        await message.reply(f"Расшифрованный текст (оплачено): {text}")
+
+        # Платная расшифровка — счётчик не изменяем
+    except sr.UnknownValueError:
+        await refund_and_notify("Не удалось распознать речь по оплаченному сообщению.")
+    except Exception as e:
+        await refund_and_notify(f"Произошла ошибка при обработке оплаченного сообщения: {e}")
+    finally:
+        try:
+            if download:
+                await download.delete()
+        except Exception:
+            pass
+        try:
+            if transcribe_msg:
+                await transcribe_msg.delete()
+        except Exception:
+            pass
+        if ogg_path and os.path.exists(ogg_path):
+            os.remove(ogg_path)
+        if wav_path and os.path.exists(wav_path):
+            os.remove(wav_path)
+
+
 @router.message()
 async def everything(message: Message, bot: Bot):
     if keyboard_input.get(message.from_user.id) == 'name':
@@ -333,15 +489,6 @@ async def everything(message: Message, bot: Bot):
     else:
         await message.reply(
             'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите 4 квадрата слева от скрепки')
-
-
-# ======== Main ========
-
-async def main():
-    bot = Bot(api_token_muziatikbot)
-    dp = Dispatcher()
-    dp.include_router(router)
-    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
