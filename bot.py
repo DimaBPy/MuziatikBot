@@ -25,16 +25,18 @@ load_dotenv()
 # ======== Keyboards ========
 
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
+    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
+])
+memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
     [InlineKeyboardButton(text='Вспомнить', callback_data='recall')],
     [InlineKeyboardButton(text='Забыть', callback_data='forget')]
 ])
-
 dev_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Roll a die')],
     [KeyboardButton(text='info')],
     [KeyboardButton(text='Settings')],
+    [KeyboardButton(text='Memory')],
     [KeyboardButton(text='Feedback')],
     [KeyboardButton(text='Reminder (no)'), KeyboardButton(text='Cats! (later)')],
     [KeyboardButton(text='What is my name? (changed)'), KeyboardButton(text='Домик (was good)')]
@@ -43,6 +45,7 @@ dev_keyboard = ReplyKeyboardMarkup(keyboard=[
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
     [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
+    [KeyboardButton(text='Память')],
     [KeyboardButton(text='Настройки')],
 ], resize_keyboard=True)
 
@@ -136,6 +139,11 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
     await send_typing_indicator(callback_query.from_user.id, bot)
     await bot.send_message(callback_query.from_user.id, f"Выпало: {dice_result}")
     await callback_query.answer(f"Выпало: {dice_result}", show_alert=True)
+
+
+@router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
+async def memory(message: Message):
+    await message.reply('Выберете действие с памятью', reply_markup=memory_keyboard)
 
 
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
@@ -347,8 +355,6 @@ async def inline_emojis(inline_query: types.InlineQuery):
     ]
     # Отправляем результаты пользователю
     await inline_query.answer(results)
-
-
 
 
 # ======== Main ========
