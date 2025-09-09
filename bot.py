@@ -98,7 +98,7 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.4.1\n"
+        "Версия — 2.5\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
         "Полезные функции выделены *жирным шрифтом*\n"
         "Вот мои функции:\n"
@@ -271,7 +271,7 @@ async def voice_to_text(message: types.Message, bot: Bot):
                 description="Вы использовали 10 бесплатных расшифровок на этой неделе. Купите доступ за 5 Звёзд.",
                 payload=f"voice_limit_5_stars:{message.voice.file_id}",
                 currency="XTR",
-                prices=[LabeledPrice(label="Voice transcription", amount=1)]
+                prices=[LabeledPrice(label="Voice transcription", amount=5 if message.from_user.id != MY_CHAT_ID else 1)]
             )
             return
 
