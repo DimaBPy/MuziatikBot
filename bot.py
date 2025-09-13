@@ -228,9 +228,13 @@ async def dev(message: Message):
 async def donate(callback_query: types.CallbackQuery):
     await callback_query.answer('Отправил кнопку доната')
     await callback_query.message.edit_text('Выбрано: Донат на 10 звезд')
-    await callback_query.message.reply_invoice('Донат', '10 звёзд за раз', 'donate',
-                                               'XTR', [LabeledPrice(label='Донат', amount=10)])
-
+    await callback_query.message.reply_invoice(
+        title='Донат',
+        description='10 звёзд за раз',
+        payload='donate',
+        currency='XTR',
+        prices=[LabeledPrice(label='Донат', amount=10)]
+    )
 
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
