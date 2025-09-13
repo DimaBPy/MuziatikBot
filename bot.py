@@ -281,7 +281,7 @@ async def voice_to_text(message: types.Message, bot: Bot):
                 description="Вы использовали 10 бесплатных расшифровок на этой неделе. Купите доступ за 5 Звёзд.",
                 payload=f"voice_limit_5_stars:{message.voice.file_id}",
                 currency="XTR",
-                prices=[LabeledPrice(label="Voice transcription", amount=5 if message.chat.id != MY_CHAT_ID else 1)]
+                prices=[LabeledPrice(label="Voice transcription", amount=5 if message.from_user.id != MY_CHAT_ID else 1)]
             )
             return
 
