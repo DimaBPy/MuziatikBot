@@ -35,7 +35,12 @@ def get_data(user_id: int, field: str = None) -> Optional[str]:
         with open('storage.json', 'r', encoding='utf-8') as f:
             data = json.load(f) or {}
         user_data = data.get(str(user_id), {})
-        return user_data.get(field.lower() if field else None) if field else user_data
+        if field:
+            return user_data.get(field.lower() if field else None)
+        else:
+            # Filter out voice_week_start_ts and voice_counter from the returned data
+            return {k: v for k, v in user_data.items()
+                    if k not in ['voice_week_start_ts', 'voice_counter']}
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
