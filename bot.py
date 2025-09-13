@@ -25,7 +25,8 @@ load_dotenv()
 # ======== Keyboards ========
 
 settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')]
+    [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
+    [InlineKeyboardButton(text='Донат', callback_data='donate')]
 ])
 memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
@@ -98,18 +99,18 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.5\n"
+        "Версия — 2.6.4\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
-        "Полезные функции выделены *жирным шрифтом*\n"
         "Вот мои функции:\n"
-        "Выбрать имя — Полная функциональность,\n"
+        "Выбрать имя — Полная функциональность.\n"
         "Кубик — полная функциональность.\n"
         "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
-        "*Память*🧠: *Публичный предпросмотр*\n"
+        "*Память*🧠: *Полная функциональность*.\n"
         "*Расшифровка голосовых сообщений в текст*:\n"
         "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n"
         "Бесплатно 10 голосовых сообщений в неделю, "
-        "далее 5 звёзд за сообщение\n\n"
+        "далее 5 звёзд за сообщение\n"
+        "Настройки > Донат: *Не даёт привилегия*: заплатите 10 звёзд чтобы поддержать разработчика\n\n"
         "Напишите @muziatikBot в любом другом чате чтобы отправить интерактивный эмодзи",
         parse_mode='Markdown', reply_markup=keyboard
     )
@@ -144,6 +145,7 @@ async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
 @router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
 async def memory_menu(message: Message):
     await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
+
 
 @router.message(lambda msg: msg.text in ['Настройки', 'Settings'])
 async def settings(message: Message):
@@ -222,12 +224,24 @@ async def dev(message: Message):
         await message.reply('Вы не разработчик')
 
 
+@router.callback_query(F.data == 'donate')
+async def donate(callback_query: types.CallbackQuery):
+    await callback_query.answer('Отправил кнопку доната')
+    await callback_query.message.edit_text('Выбрано: Донат на 10 звезд')
+    await callback_query.message.reply_invoice(
+        title='Донат',
+        description='10 звёзд за раз',
+        payload='donate',
+        currency='XTR',
+        prices=[LabeledPrice(label='Донат', amount=10)]
+    )
+
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
     global keyboard_input
     keyboard_input[message.from_user.id] = 'feedback'
     await send_typing_indicator(message.chat.id, message.bot)
-    await message.reply('_Напишите_ Ваш отзыв (бета версия)', parse_mode="Markdown")
+    await message.reply('_Напишите_ Ваш отзыв', parse_mode="Markdown")
 
 
 @router.message(F.voice)
@@ -235,7 +249,7 @@ async def voice_to_text(message: types.Message, bot: Bot):
     """
     Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
     Добавлен недельный лимит: 10 бесплатных расшифровок на пользователя.
-    При превышении отправляется счёт на 5 Stars, а расшифровка не выполняется.
+    При превышении отправляется счёт на 5 Stars.
     """
     download = None
     transcribe = None
@@ -382,8 +396,6 @@ async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: 
 @router.message(F.successful_payment)
 async def successful_payment_handler(message: types.Message, bot: Bot):
     payload = (message.successful_payment.invoice_payload or "")
-    if not payload.startswith("voice_limit_5_stars:"):
-        return
 
     async def refund_and_notify(reason: str):
         # Try to refund Stars and notify the user
@@ -406,6 +418,11 @@ async def successful_payment_handler(message: types.Message, bot: Bot):
             await message.answer(
                 f"{reason}\nНе найден идентификатор платежа для возврата. Свяжитесь с поддержкой.")
 
+    if not payload.startswith("voice_limit_5_stars:"):
+        if payload == "donate":
+            await message.reply(
+                'Спасибо! Если хотите отправить больше 10 звёзд, повторите процедуру оплаты несколько раз.')
+        return
     voice_file_id = payload.split(":", 1)[1].strip() if ":" in payload else ""
     if not voice_file_id:
         await refund_and_notify("Не удалось определить, какое сообщение расшифровать после оплаты.")
@@ -465,7 +482,7 @@ async def everything(message: Message, bot: Bot):
     elif keyboard_input.get(message.from_user.id) == 'feedback':
         await message.answer('Пишу моему создателю')
         await send_typing_indicator(message.from_user.id, bot)
-        await bot.send_message(MY_CHAT_ID, f'Эй, бро у тебя отзыв.\n{message.text}')
+        await bot.send_message(MY_CHAT_ID, f'Хозяин, у тебя отзыв.\n{message.text}')
         await message.reply('Написал')
         await send_typing_indicator(message.from_user.id, bot)
         await message.answer('Кстати, скоро у отзывов будут свои идентификаторы🔜')
