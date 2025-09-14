@@ -99,47 +99,30 @@ async def info(message: Message, bot: Bot):
     name = await asyncio.to_thread(get_data, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2.6.4\n"
+        "Версия — 2.7\n"
         "Описание: Начиная с версии 2.0, бот стал полезным в повседневной жизни.\n"
         "Вот мои функции:\n"
         "Выбрать имя — Полная функциональность.\n"
-        "Кубик — полная функциональность.\n"
+        "Кубик — Обновлено.\n"
         "Отзыв🆕: Теперь вы можете оставить отзыв про бота!\n"
         "*Память*🧠: *Полная функциональность*.\n"
         "*Расшифровка голосовых сообщений в текст*:\n"
         "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n"
         "Бесплатно 10 голосовых сообщений в неделю, "
         "далее 5 звёзд за сообщение\n"
-        "Настройки > Донат: *Не даёт привилегия*: заплатите 10 звёзд чтобы поддержать разработчика\n\n"
+        "Настройки > Донат: *Не даёт привилегий*: заплатите 10 звёзд, чтобы поддержать разработчика\n\n"
         "Напишите @muziatikBot в любом другом чате чтобы отправить интерактивный эмодзи",
         parse_mode='Markdown', reply_markup=keyboard
     )
 
 
+# @router.callback_query(lambda c: c.data == 'roll_dice')
 @router.message(lambda msg: msg.text == "Кубик" or msg.text == 'Roll a die')
-async def dice(message: Message, bot: Bot):
-    inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="Брось кубик (стикер)", callback_data="roll_dice")],
-        [InlineKeyboardButton(
-            text='Случайное число (текст)', callback_data='text_dice')]
-    ])
-    await message.answer("Выберите вариант:", reply_markup=inline_keyboard)
-
-
-@router.callback_query(lambda c: c.data == 'roll_dice')
-async def roll_dice(callback_query: types.CallbackQuery, bot: Bot):
-    await bot.send_dice(callback_query.from_user.id)
+async def roll_dice(message: Message, bot: Bot):
+    dice_sticker = await bot.send_dice(message.from_user.id)
     await asyncio.sleep(4)
-    await callback_query.answer()
-
-
-@router.callback_query(lambda c: c.data == "text_dice")
-async def text_dice(callback_query: types.CallbackQuery, bot: Bot):
-    dice_result = random.randint(1, 6)
-    await send_typing_indicator(callback_query.from_user.id, bot)
-    await bot.send_message(callback_query.from_user.id, f"Выпало: {dice_result}")
-    await callback_query.answer(f"Выпало: {dice_result}", show_alert=True)
+    # await callback_query.answer()
+    await message.answer(f'Выпало {dice_sticker.dice.value}')
 
 
 @router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
@@ -236,6 +219,7 @@ async def donate(callback_query: types.CallbackQuery):
         prices=[LabeledPrice(label='Донат', amount=10)]
     )
 
+
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
     global keyboard_input
@@ -285,7 +269,8 @@ async def voice_to_text(message: types.Message, bot: Bot):
                 description="Вы использовали 10 бесплатных расшифровок на этой неделе. Купите доступ за 5 Звёзд.",
                 payload=f"voice_limit_5_stars:{message.voice.file_id}",
                 currency="XTR",
-                prices=[LabeledPrice(label="Voice transcription", amount=5 if message.from_user.id != MY_CHAT_ID else 1)]
+                prices=[
+                    LabeledPrice(label="Voice transcription", amount=5 if message.from_user.id != MY_CHAT_ID else 1)]
             )
             return
 
