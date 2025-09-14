@@ -1,3 +1,30 @@
+"""
+This is a legacy version of MuziatikBot!
+The new version is bot.py
+
+
+A bot that interacts with users to provide reminders, cat-related media, personalized greetings,
+and enables controlled access to a virtual "house". The bot uses the aiogram framework for
+Telegram Bot API integration.
+
+Modules included:
+- aiogram: Provides bot-building capabilities.
+- apscheduler: Schedules background tasks.
+- dotenv: Loads environment variables from a .env file.
+- asyncio: Handles asynchronous tasks.
+- Other supporting modules for threading, randomization, and HTTP requests.
+
+Exported functions:
+- process_start_command: Welcomes the user upon issuing the "start" command.
+- my_name: Replies with the user's Telegram display name and username.
+- cats: Shares randomized cat-related media.
+- home: Initiates interaction for controlled house entry/exit with user approval.
+- may_go_house: Handles inline keyboard callbacks confirming house entry/exit.
+- go_house: Completes the interaction related to guest house entry/exit.
+
+The bot is designed to be conversational and execute tasks based on user interaction.
+"""
+
 import asyncio
 import datetime
 import os
