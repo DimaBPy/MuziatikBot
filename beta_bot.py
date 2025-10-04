@@ -1,16 +1,14 @@
 import asyncio
 import os
-import random
+import speech_recognition as sr
 import time
-
-from db import remember, recall, forget
-from aiogram import Bot, Dispatcher, Router, types, F
-from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
-    InlineQueryResultArticle, InputTextMessageContent, LabeledPrice
+from aiogram import Bot
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
+    InlineQueryResultArticle, LabeledPrice, CallbackQuery, InlineQuery, PreCheckoutQuery, InputTextMessageContent
 from dotenv import load_dotenv
 from pydub import AudioSegment
-import speech_recognition as sr
+
+from db import remember, recall, forget
 
 
 def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
@@ -59,7 +57,6 @@ try:
 except TypeError as e:
     print(f'Ключа та нет... :\n{e}')
 
-router = Router()
 keyboard_input = {}
 
 
@@ -72,10 +69,7 @@ async def send_typing_indicator(chat_id, bot, wait=1, action='typing'):
     await bot.delete_message(chat_id, dots.message_id)
 
 
-# ======== Handlers ========
-
-@router.message(Command('start'))
-async def start_bot(message: Message):
+async def start_bot(message):
     await send_typing_indicator(message.chat.id, message.bot)
     await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
     await asyncio.sleep(1)
@@ -91,8 +85,7 @@ async def start_bot(message: Message):
     )
 
 
-@router.message(lambda msg: msg.text == 'info')
-async def info(message: Message, bot: Bot):
+async def info(message, bot):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA', reply_markup=keyboard)
     await asyncio.sleep(3)
@@ -116,8 +109,7 @@ async def info(message: Message, bot: Bot):
         ]))
 
 
-@router.callback_query(F.data == 'status')
-async def status(callback_query: types.CallbackQuery):
+async def status(callback_query):
     await callback_query.message.edit_text(
         "Выбрать имя — ✅\n"
         "Кубик (Обновлено) — ✅\n"
@@ -127,8 +119,7 @@ async def status(callback_query: types.CallbackQuery):
         parse_mode='Markdown')
 
 
-@router.callback_query(F.data == 'changelog')
-async def changelog(callback_query: types.CallbackQuery):
+async def changelog(callback_query):
     await callback_query.message.edit_text(
         "В Версии 2.1: Добавлена расшифровка голосовых сообщений.\n"
         "2.2: Кубик и тд. в чатах с другими людьми\n"
@@ -137,27 +128,23 @@ async def changelog(callback_query: types.CallbackQuery):
     )
 
 
-@router.message(lambda msg: msg.text == "Кубик" or msg.text == 'Roll a die')
-async def roll_dice(message: Message, bot: Bot):
+async def roll_dice(message, bot):
     dice_sticker = await bot.send_dice(message.from_user.id)
     await asyncio.create_task(send_typing_indicator(message.chat.id, bot,
                                                     wait=3, action='choose_sticker'))
     await message.answer(f'Выпало {dice_sticker.dice.value}')
 
 
-@router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
-async def memory_menu(message: Message):
+async def memory_menu(message):
     await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
 
 
-@router.message(lambda msg: msg.text in ['Меню', 'Menu'])
-async def menu(message: Message):
+async def menu(message):
     await message.reply('Вот меню', reply_markup=menu_keyboard,
                         parse_mode="Markdown")
 
 
-@router.callback_query(lambda c: c.data == 'name')
-async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
+async def choose_name(callback_query, bot):
     await callback_query.message.edit_text('Как вас называть?')
     await callback_query.answer()
     await asyncio.sleep(1)
@@ -172,8 +159,7 @@ async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
     )
 
 
-@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input'])
-async def set_name(callback_query: types.CallbackQuery, bot: Bot):
+async def set_name(callback_query, bot):
     if callback_query.data == 'full_name':
         name = callback_query.from_user.full_name
         remember(callback_query.from_user.id, name, field='name')
@@ -188,8 +174,7 @@ async def set_name(callback_query: types.CallbackQuery, bot: Bot):
         await callback_query.answer('Хорошо, пишите', show_alert=True)
 
 
-@router.callback_query(lambda c: c.data == 'remember' or c.data == 'recall' or c.data == 'forget')
-async def memory(callback_query: types.CallbackQuery):
+async def memory(callback_query):
     if callback_query.data == 'remember':
         await callback_query.answer('Пишите. Правила: 🆕как хотите',
                                     show_alert=True)
@@ -209,8 +194,7 @@ async def memory(callback_query: types.CallbackQuery):
         await callback_query.message.answer('\n'.join(recall(callback_query.from_user.id)))
 
 
-@router.message(lambda msg: msg.text == 'dev')
-async def dev(message: Message):
+async def dev(message):
     await send_typing_indicator(message.chat.id, message.bot, wait=2)
     await message.reply('Проверяю')
     await send_typing_indicator(message.chat.id, message.bot, wait=3)
@@ -220,8 +204,7 @@ async def dev(message: Message):
         await message.reply('Вы не разработчик')
 
 
-@router.callback_query(F.data == 'donate')
-async def donate(callback_query: types.CallbackQuery):
+async def donate(callback_query):
     await callback_query.answer('Отправил кнопку доната')
     await callback_query.message.edit_text('Выбрано: Донат на 10 звезд')
     await callback_query.message.reply_invoice(
@@ -233,16 +216,14 @@ async def donate(callback_query: types.CallbackQuery):
     )
 
 
-@router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
-async def feedback(message: Message):
+async def feedback(message):
     global keyboard_input
     keyboard_input[message.from_user.id] = 'feedback'
     await send_typing_indicator(message.chat.id, message.bot)
     await message.reply('_Напишите_ Ваш отзыв', parse_mode="Markdown")
 
 
-@router.message(F.voice)
-async def voice_to_text(message: types.Message, bot: Bot):
+async def voice_to_text(message, bot):
     """
     Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
     Добавлен недельный лимит: 10 бесплатных расшифровок на пользователя.
@@ -327,8 +308,7 @@ async def voice_to_text(message: types.Message, bot: Bot):
             os.remove(wav_path)
 
 
-@router.inline_query()
-async def inline_emojis(inline_query: types.InlineQuery):
+async def inline_emojis(inline_query):
     # Создаём список всех интерактивных эмодзи
     results = [
         InlineQueryResultArticle(
@@ -365,20 +345,9 @@ async def inline_emojis(inline_query: types.InlineQuery):
     # Отправляем результаты пользователю
     await inline_query.answer(results)
 
-
-# ======== Main ========
-
-async def main():
-    bot = Bot(api_token_muziatikbot)
-    dp = Dispatcher()
-    dp.include_router(router)
-    await dp.start_polling(bot)
-
-
 # ======== Payments Handlers ========
 
-@router.pre_checkout_query()
-async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: Bot):
+async def pre_checkout_handler(pre_checkout_query, bot):
     try:
         await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
     except Exception:
@@ -391,8 +360,7 @@ async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: 
             pass
 
 
-@router.message(F.successful_payment)
-async def successful_payment_handler(message: types.Message, bot: Bot):
+async def successful_payment_handler(message, bot):
     payload = (message.successful_payment.invoice_payload or "")
 
     async def refund_and_notify(reason: str):
@@ -471,8 +439,7 @@ async def successful_payment_handler(message: types.Message, bot: Bot):
             os.remove(wav_path)
 
 
-@router.message()
-async def everything(message: Message, bot: Bot):
+async def everything(message, bot):
     if keyboard_input.get(message.from_user.id) == 'name':
         remember(message.from_user.id, message.text, field=True)
         del keyboard_input[message.from_user.id]
@@ -507,7 +474,3 @@ async def everything(message: Message, bot: Bot):
     else:
         await message.reply(
             'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите на 4 квадрата слева от скрепки')
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
