@@ -22,9 +22,10 @@ load_dotenv()
 
 # ======== Keyboards ========
 
-settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+menu_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
-    [InlineKeyboardButton(text='Донат', callback_data='donate')]
+    [InlineKeyboardButton(text='Донат', callback_data='donate')],
+    [InlineKeyboardButton(text='Версия', callback_data='chanel')]
 ])
 memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
@@ -34,7 +35,7 @@ memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 dev_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Roll a die')],
     [KeyboardButton(text='info')],
-    [KeyboardButton(text='Settings')],
+    [KeyboardButton(text='Menu')],
     [KeyboardButton(text='Memory')],
     [KeyboardButton(text='Feedback')],
     [KeyboardButton(text='Reminder (no)'), KeyboardButton(text='Cats! (later)')],
@@ -45,7 +46,7 @@ keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
     [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
     [KeyboardButton(text='Память')],
-    [KeyboardButton(text='Настройки')],
+    [KeyboardButton(text='Меню')],
 ], resize_keyboard=True)
 
 # ======== Config ========
@@ -106,7 +107,7 @@ async def info(message, bot):
         "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n"
         "Бесплатно 10 голосовых сообщений в неделю, "
         "далее 5 звёзд за сообщение\n"
-        "Настройки > Донат: *Не даёт привилегий*: заплатите 10 звёзд, чтобы поддержать разработчика\n\n"
+        "Меню > Донат: *Не даёт привилегий*: заплатите 10 звёзд, чтобы поддержать разработчика\n\n"
         "Напишите @muziatikBot в любом другом чате чтобы отправить интерактивный эмодзи",
         parse_mode='Markdown', reply_markup=keyboard
     )
@@ -123,8 +124,8 @@ async def memory_menu(message):
     await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
 
 
-async def settings(message):
-    await message.reply('Вот настройки', reply_markup=settings_keyboard,
+async def menu(message):
+    await message.reply('Вот Меню', reply_markup=menu_keyboard,
                         parse_mode="Markdown")
 
 

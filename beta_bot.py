@@ -24,7 +24,8 @@ load_dotenv()
 
 menu_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
-    [InlineKeyboardButton(text='Донат', callback_data='donate')]
+    [InlineKeyboardButton(text='Донат', callback_data='donate')],
+    [InlineKeyboardButton(text='Версия', callback_data='chanel')]
 ])
 memory_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Запомнить', callback_data='remember')],
@@ -114,7 +115,7 @@ async def status(callback_query):
         "Выбрать имя — ✅\n"
         "Кубик (Обновлено) — ✅\n"
         "Отзыв — ✅\n"
-        "*Память*🧠 — Ведутся работы🔄\n"
+        "*Память*🧠 — Работает✅\n"
         "*Расшифровка голосовых сообщений в текст* — 🔄️Возможны проблемы из-за в памяти\n",
         parse_mode='Markdown')
 
@@ -284,7 +285,7 @@ async def voice_to_text(message, bot):
         # Отправляем расшифрованный текст
         await message.reply(f"Расшифрованный текст: {text}")
         # Увеличиваем счётчик после успешной расшифровки
-        remember(user_id, counter + 1)
+        remember(user_id, counter + 1, 'voice_counter')
 
     except sr.UnknownValueError:
         await message.reply("Не удалось распознать речь.")

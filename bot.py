@@ -2,10 +2,33 @@ import asyncio
 import os
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 import beta_bot
+import stable_bot
+from db import recall, remember
+
+
+def _select_module(user_id: int):
+    try:
+        return beta_bot if recall(user_id, field='beta') == 'True' else stable_bot
+    except Exception:
+        # Fallback to stable on any recall issues
+        return stable_bot
+
+
+def _dispatch(func_name: str, user_id: int):
+    mod = _select_module(user_id)
+    # If function not present in selected module, fallback to beta version if available
+    if hasattr(mod, func_name):
+        return getattr(mod, func_name)
+    # Prefer beta implementation as a universal fallback for missing handlers
+    if hasattr(beta_bot, func_name):
+        return getattr(beta_bot, func_name)
+    # As a last resort, try stable
+    return getattr(stable_bot, func_name)
+
 
 load_dotenv()
 
@@ -20,84 +43,109 @@ except TypeError as e:
 
 router = Router()
 
+
 # ======== Handlers ========
 
 @router.message(Command('start'))
 async def start_bot(message: Message):
-    await beta_bot.start_bot(message)
+    await _dispatch('start_bot', message.from_user.id)(message)
 
 
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message, bot: Bot):
-    await beta_bot.info(message, bot)
+    await _dispatch('info', message.from_user.id)(message, bot)
 
 
 @router.callback_query(F.data == 'status')
 async def status(callback_query: types.CallbackQuery):
-    await beta_bot.status(callback_query)
+    await _dispatch('status', callback_query.from_user.id)(callback_query)
 
 
 @router.callback_query(F.data == 'changelog')
 async def changelog(callback_query: types.CallbackQuery):
-    await beta_bot.changelog(callback_query)
+    await _dispatch('changelog', callback_query.from_user.id)(callback_query)
+
 
 @router.message(lambda msg: msg.text == "Кубик" or msg.text == 'Roll a die')
 async def roll_dice(message: Message, bot: Bot):
-    await beta_bot.roll_dice(message, bot)
+    await _dispatch('roll_dice', message.from_user.id)(message, bot)
+
 
 @router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
 async def memory_menu(message: Message):
-    await beta_bot.memory_menu(message)
+    await _dispatch('memory_menu', message.from_user.id)(message)
 
 
 @router.message(lambda msg: msg.text in ['Меню', 'Menu'])
 async def menu(message: Message):
-    await beta_bot.menu(message)
+    await _dispatch('menu', message.from_user.id)(message)
 
 
 @router.callback_query(lambda c: c.data == 'name')
 async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
-    await beta_bot.choose_name(callback_query, bot)
+    await _dispatch('choose_name', callback_query.from_user.id)(callback_query, bot)
 
 
 @router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input'])
 async def set_name(callback_query: types.CallbackQuery, bot: Bot):
-    await beta_bot.set_name(callback_query, bot)
+    await _dispatch('set_name', callback_query.from_user.id)(callback_query, bot)
 
 
 @router.callback_query(lambda c: c.data == 'remember' or c.data == 'recall' or c.data == 'forget')
 async def memory(callback_query: types.CallbackQuery):
-    await beta_bot.memory(callback_query)
+    await _dispatch('memory', callback_query.from_user.id)(callback_query)
 
 
-@router.message(lambda msg: msg.text == 'dev')
+@router.message(F.text == 'dev')
 async def dev(message: Message):
-    await beta_bot.dev(message)
+    await _dispatch('dev', message.from_user.id)(message)
 
 
 @router.callback_query(F.data == 'donate')
 async def donate(callback_query: types.CallbackQuery):
-    await beta_bot.donate(callback_query)
+    await _dispatch('donate', callback_query.from_user.id)(callback_query)
 
 
 @router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
-    await beta_bot.feedback(message)
+    await _dispatch('feedback', message.from_user.id)(message)
 
 
 @router.message(F.voice)
-async def voice_to_text(message: types.Message, bot: Bot):
+async def voice_to_text(message: Message, bot: Bot):
     """
     Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
     Добавлен недельный лимит: 10 бесплатных расшифровок на пользователя.
     При превышении отправляется счёт на 5 Stars.
     """
-    await beta_bot.voice_to_text(message, bot)
+    await _dispatch('voice_to_text', message.from_user.id)(message, bot)
+
 
 @router.inline_query()
 async def inline_emojis(inline_query: types.InlineQuery):
     # Создаём список всех интерактивных эмодзи
-    await beta_bot.inline_emojis(inline_query)
+    await _dispatch('inline_emojis', inline_query.from_user.id)(inline_query)
+
+
+@router.callback_query(F.data == 'chanel')
+async def chanel(callback_query: types.CallbackQuery):
+    print('yes')
+    await callback_query.message.edit_text('Выберете версию:',
+                                           reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                               [InlineKeyboardButton(text='beta', callback_data='beta')],
+                                               [InlineKeyboardButton(text='стабильная', callback_data='stable')]]))
+
+
+@router.callback_query(F.data == 'beta')
+async def beta(callback_query: types.CallbackQuery):
+    remember(callback_query.from_user.id, 'True', 'beta')
+    await callback_query.message.edit_text(text='Готово, теперь вы будете использовать beta-версию')
+
+
+@router.callback_query(F.data == 'stable')
+async def stable(callback_query: types.CallbackQuery):
+    remember(callback_query.from_user.id, 'False', 'beta')
+    await callback_query.message.edit_text(text='Готово, теперь вы будете использовать стабильную версию')
 
 
 # ======== Main ========
@@ -113,16 +161,17 @@ async def main():
 
 @router.pre_checkout_query()
 async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: Bot):
-    await beta_bot.pre_checkout_handler(pre_checkout_query, bot)
+    await _dispatch('pre_checkout_handler', pre_checkout_query.from_user.id)(pre_checkout_query, bot)
 
 
 @router.message(F.successful_payment)
 async def successful_payment_handler(message: types.Message, bot: Bot):
-    await beta_bot.successful_payment_handler(message, bot)
+    await _dispatch('successful_payment_handler', message.from_user.id)(message, bot)
+
 
 @router.message()
 async def everything(message: Message, bot: Bot):
-    await beta_bot.everything(message, bot)
+    await _dispatch('everything', message.from_user.id)(message, bot)
 
 
 if __name__ == "__main__":
