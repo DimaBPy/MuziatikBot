@@ -465,7 +465,7 @@ async def everything(message, bot):
         del keyboard_input[message.from_user.id]
         if message.text.lower() in ('все', 'всё'):
             forget(message.from_user.id)
-            await message.reply('Удалил вас из базы🥸')
+            await message.reply('Удалил все записи')
             return
         if message.text not in recall(message.from_user.id, 'id'):
             await message.answer('Такого ключа нет')
