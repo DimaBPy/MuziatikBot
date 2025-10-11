@@ -7,6 +7,7 @@ def connect_db():
     return con
 
 
+counter = 0
 def remember(user_id: int, value, field=None):
     """Save or update a field for a specific user (nested dictionary)."""
     con = connect_db()
@@ -33,6 +34,9 @@ def remember(user_id: int, value, field=None):
                 (value, user_id)
             )
         con.commit()
+        global counter
+        counter += 1
+        print(f'{counter=}')
     finally:
         con.close()
 
@@ -48,9 +52,9 @@ def recall(user_id: int, field=None):
                                  FROM users
                                  WHERE tg_id = ?''', (user_id,))
             result = cursor.fetchone()
-            print(result)
+            print(result, '1')
             result = result[0]
-            print(result)
+            print(result, '2')
         else:
             cursor = con.execute('''SELECT memory.id, data
                                     FROM memory
