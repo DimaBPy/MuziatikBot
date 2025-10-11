@@ -7,6 +7,23 @@ def connect_db():
     return con
 
 
+import sqlite3
+import datetime
+
+
+def connect_db():
+    con = sqlite3.connect('muziatikBot.db')
+    con.cursor()
+    return con
+
+
+def log_event(event, user_id, value, field, extra=''):
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_msg = f"[{timestamp}] {event}: user_id={user_id}, field={field}, value={value} {extra}"
+    with open('memory_log.txt', 'a', encoding='utf-8') as logf:
+        logf.write(log_msg + '\n')
+    print(log_msg)
+
 counter = 0
 def remember(user_id: int, value, field=None):
     """Save or update a field for a specific user (nested dictionary)."""
@@ -23,16 +40,32 @@ def remember(user_id: int, value, field=None):
                         SET {field} = ?
                         WHERE tg_id = ?
                         ''', (value, user_id))
+            log_event('FIELD_UPDATE', user_id, value, field)
         else:
-            con.execute(
+            cursor = con.execute(
                 """
-                INSERT INTO memory (user_id, data)
-                SELECT id, ?
-                FROM users
-                WHERE tg_id = ?
+                SELECT memory.id
+                FROM memory
+                         JOIN users ON memory.user_id = users.id
+                WHERE users.tg_id = ?
+                  AND memory.data = ?
                 """,
-                (value, user_id)
+                (user_id, value)
             )
+            exists = cursor.fetchone()
+            if exists:
+                log_event('DUPLICATE_FOUND', user_id, value, field, extra=f'found_id={exists[0]}')
+            else:
+                con.execute(
+                    """
+                    INSERT INTO memory (user_id, data)
+                    SELECT id, ?
+                    FROM users
+                    WHERE tg_id = ?
+                    """,
+                    (value, user_id)
+                )
+                log_event('MEMORY_INSERT', user_id, value, field)
         con.commit()
         global counter
         counter += 1
