@@ -1,13 +1,4 @@
 import sqlite3
-
-
-def connect_db():
-    con = sqlite3.connect('muziatikBot.db')
-    con.cursor()
-    return con
-
-
-import sqlite3
 import datetime
 
 
