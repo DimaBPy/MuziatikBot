@@ -33,30 +33,16 @@ def remember(user_id: int, value, field=None):
                         ''', (value, user_id))
             log_event('FIELD_UPDATE', user_id, value, field)
         else:
-            cursor = con.execute(
+            con.execute(
                 """
-                SELECT memory.id
-                FROM memory
-                         JOIN users ON memory.user_id = users.id
-                WHERE users.tg_id = ?
-                  AND memory.data = ?
+                INSERT INTO memory (user_id, data)
+                SELECT id, ?
+                FROM users
+                WHERE tg_id = ?
                 """,
-                (user_id, value)
+                (value, user_id)
             )
-            exists = cursor.fetchone()
-            if exists:
-                log_event('DUPLICATE_FOUND', user_id, value, field, extra=f'found_id={exists[0]}')
-            else:
-                con.execute(
-                    """
-                    INSERT INTO memory (user_id, data)
-                    SELECT id, ?
-                    FROM users
-                    WHERE tg_id = ?
-                    """,
-                    (value, user_id)
-                )
-                log_event('MEMORY_INSERT', user_id, value, field)
+            log_event('MEMORY_INSERT', user_id, value, field)
         con.commit()
         global counter
         counter += 1
