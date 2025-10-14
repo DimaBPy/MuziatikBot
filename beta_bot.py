@@ -74,11 +74,12 @@ async def start_bot(message):
     await send_typing_indicator(message.chat.id, message.bot)
     await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
     await asyncio.sleep(1)
-    user_name = recall(message.from_user.id, "name")
-    if not user_name:
+    if name := await asyncio.to_thread(recall, message.from_user.id, "user_name"):
+        name = name if name != "Нет элементов в памяти😔" else "гость"
+    if not name:
         await message.answer('Давайте познакомимся!')
     else:
-        await message.answer(f'О! Я вас помню! Вы {user_name}')
+        await message.answer(f'О! Я вас помню! Вы {name}')
     await message.answer(
         "Нажмите на _кнопку_ внизу, чтобы узнать больше обо мне.",
         parse_mode="Markdown",
@@ -91,7 +92,8 @@ async def info(message, bot):
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA', reply_markup=keyboard)
     await asyncio.sleep(3)
     # Prefetch the user's name off the event loop, with a fallback
-    name = await asyncio.to_thread(recall, message.from_user.id, "name") or "гость"
+    if name := await asyncio.to_thread(recall, message.from_user.id, "name"):
+        name = name if name != "Нет элементов в памяти😔" else "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
         "Версия — 3\\.0 beta\n"
@@ -345,6 +347,7 @@ async def inline_emojis(inline_query):
     ]
     # Отправляем результаты пользователю
     await inline_query.answer(results)
+
 
 # ======== Payments Handlers ========
 
