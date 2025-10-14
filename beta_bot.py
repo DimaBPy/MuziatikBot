@@ -75,7 +75,7 @@ async def start_bot(message):
     await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
     await asyncio.sleep(1)
     if name := await asyncio.to_thread(recall, message.from_user.id, "user_name"):
-        name = name if name != ["Нет элементов в памяти😔"] else "гость"
+        name = name if name != ["Нет элементов в памяти😔"] else None
     if not name:
         await message.answer('Давайте познакомимся!')
     else:
