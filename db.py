@@ -62,9 +62,7 @@ def recall(user_id: int, field=None):
                                  FROM users
                                  WHERE tg_id = ?''', (user_id,))
             result = cursor.fetchone()
-            print(result, '1')
             result = result[0]
-            print(result, '2')
         else:
             cursor = con.execute('''SELECT memory.id, data
                                     FROM memory
