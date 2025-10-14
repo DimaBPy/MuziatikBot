@@ -94,7 +94,7 @@ async def info(message, bot):
     name = await asyncio.to_thread(recall, message.from_user.id, "name") or "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 2\\.10 \\(3\\.0 alpha\\)\n"
+        "Версия — 3\\.0 beta\n"
         "Вы можете узнать про доступность функций по кнопке под сообщением\n"
         "Описание: Начиная с версии 2\\.0, бот стал полезным в повседневной жизни\\.\n"
         "Вот мои функции:\n"
