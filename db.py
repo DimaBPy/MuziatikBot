@@ -65,8 +65,8 @@ def recall(user_id: int, field=None):
                                  SELECT {field}
                                  FROM users
                                  WHERE tg_id = %s''', (user_id,))
-            result = cur.fetchone()
-            result = result[0]
+            row = cur.fetchone()
+            result = row[0] if row else None
         else:
             cur.execute('''SELECT memory.id, data
                                     FROM memory
@@ -122,16 +122,56 @@ def forget_name(user_id: int):
         con.close()
 
 
-def create_feedback():
-    pass
+def create_feedback(user_id: int, message: str, urgent: bool = False) -> int:
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            INSERT INTO feedback (user_id, message, urgent)
+            VALUES ((SELECT id FROM users WHERE tg_id = %s), %s, %s)
+            RETURNING id
+            """,
+            (user_id, message, int(urgent)),
+        )
+        feedback_id = cur.fetchone()[0]
+        con.commit()
+        return feedback_id
+    finally:
+        con.close()
 
 
-def get_feedback():
-    pass
+def get_feedback(user_id: int):
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            SELECT id, message, urgent
+            FROM feedback
+            WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)
+            ORDER BY id
+            """,
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        return [(row[0], row[1], bool(row[2])) for row in rows]
+    finally:
+        con.close()
 
 
-def delete_feedback():
-    pass
+def delete_feedback(user_id: int, feedback_id: int) -> None:
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            DELETE FROM feedback
+            WHERE id = %s
+              AND user_id = (SELECT id FROM users WHERE tg_id = %s)
+            """,
+            (feedback_id, user_id),
+        )
+        con.commit()
+    finally:
+        con.close()
 
 
 if __name__ == "__main__":
