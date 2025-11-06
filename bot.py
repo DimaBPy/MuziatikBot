@@ -86,7 +86,7 @@ async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
     await _dispatch('choose_name', callback_query.from_user.id)(callback_query, bot)
 
 
-@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input'])
+@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input', 'no-name'])
 async def set_name(callback_query: types.CallbackQuery, bot: Bot):
     await _dispatch('set_name', callback_query.from_user.id)(callback_query, bot)
 
@@ -106,7 +106,7 @@ async def donate(callback_query: types.CallbackQuery):
     await _dispatch('donate', callback_query.from_user.id)(callback_query)
 
 
-@router.message(lambda msg: msg.text == 'Отзыв' or msg.text == 'Feedback')
+@router.message(lambda msg: msg.text == 'Вопрос/Отзыв' or msg.text == 'Feedback')
 async def feedback(message: Message):
     await _dispatch('feedback', message.from_user.id)(message)
 
@@ -129,7 +129,6 @@ async def inline_emojis(inline_query: types.InlineQuery):
 
 @router.callback_query(F.data == 'chanel')
 async def chanel(callback_query: types.CallbackQuery):
-    print('yes')
     await callback_query.message.edit_text('Выберете версию:',
                                            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                                                [InlineKeyboardButton(text='beta', callback_data='beta')],

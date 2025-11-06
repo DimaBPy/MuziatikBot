@@ -4,11 +4,12 @@ import speech_recognition as sr
 import time
 from aiogram import Bot
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
-    InlineQueryResultArticle, LabeledPrice, CallbackQuery, InlineQuery, PreCheckoutQuery, InputTextMessageContent
+    InlineQueryResultArticle, LabeledPrice, Message, CallbackQuery, InlineQuery, PreCheckoutQuery, \
+    InputTextMessageContent
 from dotenv import load_dotenv
 from pydub import AudioSegment
 
-from db import remember, recall, forget
+from db import remember, recall, forget, forget_name
 
 
 def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
@@ -21,6 +22,13 @@ def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
 load_dotenv()
 
 # ======== Keyboards ========
+
+name_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text='ФИ', callback_data='full_name'),
+     InlineKeyboardButton(text='имя пользователя', callback_data='username')],
+    [InlineKeyboardButton(text='Ввести вручную', callback_data='keyboard_input')],
+    [InlineKeyboardButton(text='Никак', callback_data='no-name')]
+])
 
 menu_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text='Выбрать имя', callback_data='name')],
@@ -44,7 +52,7 @@ dev_keyboard = ReplyKeyboardMarkup(keyboard=[
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Кубик')],
-    [KeyboardButton(text='info'), KeyboardButton(text='Отзыв')],
+    [KeyboardButton(text='info'), KeyboardButton(text='Вопрос/Отзыв')],
     [KeyboardButton(text='Память')],
     [KeyboardButton(text='Меню')],
 ], resize_keyboard=True)
@@ -63,21 +71,22 @@ keyboard_input = {}
 
 # ======== Helper ========
 
-async def send_typing_indicator(chat_id, bot, wait=1, action='typing'):
+async def send_typing_indicator(chat_id, bot: Bot, wait=1, action='typing'):
     dots = await bot.send_message(chat_id, "...")
     await bot.send_chat_action(chat_id, action)
     await asyncio.sleep(wait)
     await bot.delete_message(chat_id, dots.message_id)
 
 
-async def start_bot(message):
+async def start_bot(message: Message):
     await send_typing_indicator(message.chat.id, message.bot)
     await message.answer("Здравствуйте, я **MuziatikBot**.", parse_mode="Markdown")
     await asyncio.sleep(1)
     if name := await asyncio.to_thread(recall, message.from_user.id, "name"):
         name = name if name != ["Нет элементов в памяти😔"] else None
     if not name:
-        await message.answer('Давайте познакомимся!')
+        await message.answer('Давайте познакомимся! Нажмите "Выбрать имя"')
+        await menu(message)
     else:
         await message.answer(f'О! Я вас помню! Вы {name}')
     await message.answer(
@@ -87,7 +96,7 @@ async def start_bot(message):
     )
 
 
-async def info(message, bot):
+async def info(message: Message):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA', reply_markup=keyboard)
     await asyncio.sleep(3)
@@ -112,17 +121,17 @@ async def info(message, bot):
         ]))
 
 
-async def status(callback_query):
+async def status(callback_query: CallbackQuery):
     await callback_query.message.edit_text(
         "Выбрать имя — ✅\n"
         "Кубик (Обновлено) — ✅\n"
         "Отзыв — ✅\n"
-        "*Память*🧠 — Работает✅\n"
-        "*Расшифровка голосовых сообщений в текст* — 🔄️Возможны проблемы из-за в памяти\n",
+        "*Память*🧠 — ✅\n"
+        "*Расшифровка голосовых сообщений в текст* — ✅\n",
         parse_mode='Markdown')
 
 
-async def changelog(callback_query):
+async def changelog(callback_query: CallbackQuery):
     await callback_query.message.edit_text(
         "В Версии 2.1: Добавлена расшифровка голосовых сообщений.\n"
         "2.2: Кубик и тд. в чатах с другими людьми\n"
@@ -131,38 +140,34 @@ async def changelog(callback_query):
     )
 
 
-async def roll_dice(message, bot):
+async def roll_dice(message: Message, bot: Bot):
     dice_sticker = await bot.send_dice(message.from_user.id)
     await asyncio.create_task(send_typing_indicator(message.chat.id, bot,
                                                     wait=3, action='choose_sticker'))
     await message.answer(f'Выпало {dice_sticker.dice.value}')
 
 
-async def memory_menu(message):
+async def memory_menu(message: Message):
     await message.reply('Выберите действие с памятью', reply_markup=memory_keyboard)
 
 
-async def menu(message):
+async def menu(message: Message):
     await message.reply('Вот меню', reply_markup=menu_keyboard,
                         parse_mode="Markdown")
 
 
-async def choose_name(callback_query, bot):
+async def choose_name(callback_query: CallbackQuery, bot: Bot):
     await callback_query.message.edit_text('Как вас называть?')
     await callback_query.answer()
     await asyncio.sleep(1)
     await bot.edit_message_reply_markup(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='ФИ', callback_data='full_name'),
-             InlineKeyboardButton(text='имя пользователя', callback_data='username')],
-            [InlineKeyboardButton(text='Ввести вручную', callback_data='keyboard_input')],
-        ])
+        reply_markup=name_keyboard
     )
 
 
-async def set_name(callback_query, bot):
+async def set_name(callback_query: CallbackQuery, bot: Bot):
     if callback_query.data == 'full_name':
         name = callback_query.from_user.full_name
         remember(callback_query.from_user.id, name, field='name')
@@ -171,13 +176,16 @@ async def set_name(callback_query, bot):
         name = callback_query.from_user.username
         remember(callback_query.from_user.id, name, field='name')
         await callback_query.answer(f'Хорошо, {name}')
+    elif callback_query.data == 'no-name':
+        forget_name(callback_query.from_user.id)
+        await callback_query.answer('Ну, ладно... теперь у вас нет имени')
     else:
         await send_typing_indicator(callback_query.message.chat.id, bot)
         keyboard_input[callback_query.from_user.id] = 'name'
         await callback_query.answer('Хорошо, пишите', show_alert=True)
 
 
-async def memory(callback_query):
+async def memory(callback_query: CallbackQuery):
     if callback_query.data == 'remember':
         await callback_query.answer('Пишите. Правила: 🆕как хотите',
                                     show_alert=True)
@@ -197,7 +205,7 @@ async def memory(callback_query):
         await callback_query.message.answer('\n'.join(recall(callback_query.from_user.id)))
 
 
-async def dev(message):
+async def dev(message: Message):
     await send_typing_indicator(message.chat.id, message.bot, wait=2)
     await message.reply('Проверяю')
     await send_typing_indicator(message.chat.id, message.bot, wait=3)
@@ -207,7 +215,7 @@ async def dev(message):
         await message.reply('Вы не разработчик')
 
 
-async def donate(callback_query):
+async def donate(callback_query: CallbackQuery):
     await callback_query.answer('Отправил кнопку доната')
     await callback_query.message.edit_text('Выбрано: Донат на 10 звезд')
     await callback_query.message.reply_invoice(
@@ -219,14 +227,14 @@ async def donate(callback_query):
     )
 
 
-async def feedback(message):
+async def feedback(message: Message):
     global keyboard_input
     keyboard_input[message.from_user.id] = 'feedback'
     await send_typing_indicator(message.chat.id, message.bot)
     await message.reply('_Напишите_ Ваш отзыв', parse_mode="Markdown")
 
 
-async def voice_to_text(message, bot):
+async def voice_to_text(message: Message, bot: Bot):
     """
     Обрабатывает голосовые сообщения, расшифровывает их и отправляет текст обратно.
     Добавлен недельный лимит: 10 бесплатных расшифровок на пользователя.
@@ -311,7 +319,7 @@ async def voice_to_text(message, bot):
             os.remove(wav_path)
 
 
-async def inline_emojis(inline_query):
+async def inline_emojis(inline_query: InlineQuery):
     # Создаём список всех интерактивных эмодзи
     results = [
         InlineQueryResultArticle(
@@ -351,7 +359,7 @@ async def inline_emojis(inline_query):
 
 # ======== Payments Handlers ========
 
-async def pre_checkout_handler(pre_checkout_query, bot):
+async def pre_checkout_handler(pre_checkout_query: PreCheckoutQuery, bot: Bot):
     try:
         await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
     except Exception:
@@ -364,7 +372,7 @@ async def pre_checkout_handler(pre_checkout_query, bot):
             pass
 
 
-async def successful_payment_handler(message, bot):
+async def successful_payment_handler(message: Message, bot: Bot):
     payload = (message.successful_payment.invoice_payload or "")
 
     async def refund_and_notify(reason: str):
@@ -443,19 +451,18 @@ async def successful_payment_handler(message, bot):
             os.remove(wav_path)
 
 
-async def everything(message, bot):
+async def everything(message: Message, bot: Bot):
     if keyboard_input.get(message.from_user.id) == 'name':
         remember(message.from_user.id, message.text, field=True)
         del keyboard_input[message.from_user.id]
         await message.answer(f'Запомнил! Теперь вы — '
                              f'{recall(message.from_user.id, field='name')}')
     elif keyboard_input.get(message.from_user.id) == 'feedback':
-        await message.answer('Пишу моему создателю')
         await send_typing_indicator(message.from_user.id, bot)
         await bot.send_message(MY_CHAT_ID, f'Хозяин, у тебя отзыв.\n{message.text}')
-        await message.reply('Написал')
-        await send_typing_indicator(message.from_user.id, bot)
-        await message.answer('Кстати, скоро у отзывов будут свои идентификаторы🔜')
+        await asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
+        remember(message.from_user.id, message.text, field='feedback')
+        await message.answer('Сообщение зарегистрировано: номер — TODO')
         del keyboard_input[message.from_user.id]
     elif keyboard_input.get(message.from_user.id) == 'remember':
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
