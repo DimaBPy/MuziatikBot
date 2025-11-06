@@ -53,7 +53,7 @@ async def start_bot(message: Message):
 
 @router.message(lambda msg: msg.text == 'info')
 async def info(message: Message):
-    await _dispatch('info', message.from_user.id)(message, bot)
+    await _dispatch('info', message.from_user.id)(message)
 
 
 @router.callback_query(F.data == 'status')
