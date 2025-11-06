@@ -4,11 +4,13 @@ import psycopg2
 
 
 def connect_db():
-    con = psycopg2.connect(dbname='muziatikbot',
-                           user='dima',
-                           password='8520',
-                           host='localhost',
-                           port='5432')
+    con = psycopg2.connect(
+        dbname=os.getenv('DATABASE', 'muziatikbot'),
+        user=os.getenv('DBUSER'),
+        password=os.getenv('DB_PSWD'),
+        host='localhost',
+        port='5432',
+    )
     cur = con.cursor()
     return cur, con
 
