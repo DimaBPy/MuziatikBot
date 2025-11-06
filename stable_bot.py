@@ -88,7 +88,7 @@ async def start_bot(message):
     )
 
 
-async def info(message, bot):
+async def info(message):
     await message.reply_sticker('CAACAgIAAxkBAAEz-itoBW_hmrk-'
                                 '933qZ43mWlN1MK_QjAACsQ8AAldGSEutS54Fv2EAAe42BA')
     await asyncio.sleep(3)

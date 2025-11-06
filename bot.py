@@ -52,7 +52,7 @@ async def start_bot(message: Message):
 
 
 @router.message(lambda msg: msg.text == 'info')
-async def info(message: Message, bot: Bot):
+async def info(message: Message):
     await _dispatch('info', message.from_user.id)(message, bot)
 
 
