@@ -1,11 +1,18 @@
-import sqlite3
+import os
 import datetime
+import psycopg2
 
 
 def connect_db():
-    con = sqlite3.connect('muziatikBot.db')
-    con.cursor()
-    return con
+    con = psycopg2.connect(
+        dbname=os.getenv('DATABASE', 'muziatikbot'),
+        user=os.getenv('DBUSER'),
+        password=os.getenv('DB_PSWD'),
+        host='localhost',
+        port='5432',
+    )
+    cur = con.cursor()
+    return cur, con
 
 
 def log_event(event, user_id, value, field, extra=''):
@@ -15,38 +22,37 @@ def log_event(event, user_id, value, field, extra=''):
         logf.write(log_msg + '\n')
     print(log_msg)
 
-counter = 0
+
 def remember(user_id: int, value, field=None):
     """Save or update a field for a specific user (nested dictionary)."""
-    con = connect_db()
+    cur, con = connect_db()
     try:
-        con.execute('''
+        cur.execute('''
                     INSERT
-                    OR IGNORE INTO users (tg_id) values (?)
+                    INTO users (tg_id)
+                    values (%s)
+                    on conflict do nothing
                     ''', (user_id,))
         con.commit()
         if field in ('name', 'voice_time', 'voice_counter', 'beta'):
-            con.execute(f'''
+            cur.execute(f'''
                         UPDATE users
-                        SET {field} = ?
-                        WHERE tg_id = ?
+                        SET {field} = %s
+                        WHERE tg_id = %s
                         ''', (value, user_id))
             log_event('FIELD_UPDATE', user_id, value, field)
         else:
-            con.execute(
+            cur.execute(
                 """
                 INSERT INTO memory (user_id, data)
-                SELECT id, ?
+                SELECT id, %s
                 FROM users
-                WHERE tg_id = ?
+                WHERE tg_id = %s
                 """,
                 (value, user_id)
             )
             log_event('MEMORY_INSERT', user_id, value, field)
         con.commit()
-        global counter
-        counter += 1
-        print(f'{counter=}')
     finally:
         con.close()
 
@@ -54,23 +60,23 @@ def remember(user_id: int, value, field=None):
 # remember(1183930315, 1, 'voice_counter')
 
 def recall(user_id: int, field=None):
-    con = connect_db()
+    cur, con = connect_db()
     try:
         if field in ('name', 'voice_time', 'voice_counter', 'beta'):
-            cursor = con.execute(f'''
+            cur.execute(f'''
                                  SELECT {field}
                                  FROM users
-                                 WHERE tg_id = ?''', (user_id,))
-            result = cursor.fetchone()
-            result = result[0]
+                                 WHERE tg_id = %s''', (user_id,))
+            row = cur.fetchone()
+            result = row[0] if row else None
         else:
-            cursor = con.execute('''SELECT memory.id, data
+            cur.execute('''SELECT memory.id, data
                                     FROM memory
                                              JOIN users ON memory.user_id = users.id
-                                    WHERE users.tg_id = ?
+                           WHERE users.tg_id = %s
                                  ''', (user_id,))
             result = list()
-            data = cursor.fetchall()
+            data = cur.fetchall()
             if field == 'id':
                 for i in data:
                     result.append(str(i[0]))
@@ -87,20 +93,84 @@ def recall(user_id: int, field=None):
 
 
 def forget(user_id: int, data_id: int = None):
-    con = connect_db()
+    cur, con = connect_db()
     try:
         if not data_id:
-            con.execute('''
+            cur.execute('''
                         DELETE
                         FROM memory
-                        WHERE user_id = (SELECT id FROM users WHERE tg_id = ?)''', (user_id,))
+                        WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)''', (user_id,))
         else:
-            con.execute('''
+            cur.execute('''
                         DELETE
                         FROM memory
-                        WHERE id = ?
-                          AND user_id = (SELECT id FROM users WHERE tg_id = ?)''',
+                        WHERE id = %s
+                          AND user_id = (SELECT id FROM users WHERE tg_id = %s)''',
                         (data_id, user_id))
+        con.commit()
+    finally:
+        con.close()
+
+
+def forget_name(user_id: int):
+    cur, con = connect_db()
+    try:
+        cur.execute('''
+                    UPDATE users
+                    SET name = NULL
+                    WHERE tg_id = %s''', (user_id,))
+        con.commit()
+    finally:
+        con.close()
+
+
+def create_feedback(user_id: int, message: str, urgent: bool = False) -> int:
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            INSERT INTO feedback (user_id, message, urgent)
+            VALUES ((SELECT id FROM users WHERE tg_id = %s), %s, %s)
+            RETURNING id
+            """,
+            (user_id, message, int(urgent)),
+        )
+        feedback_id = cur.fetchone()[0]
+        con.commit()
+        return feedback_id
+    finally:
+        con.close()
+
+
+def get_feedback(user_id: int):
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            SELECT id, message, urgent
+            FROM feedback
+            WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)
+            ORDER BY id
+            """,
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        return [(row[0], row[1], bool(row[2])) for row in rows]
+    finally:
+        con.close()
+
+
+def delete_feedback(user_id: int, feedback_id: int) -> None:
+    cur, con = connect_db()
+    try:
+        cur.execute(
+            """
+            DELETE FROM feedback
+            WHERE id = %s
+              AND user_id = (SELECT id FROM users WHERE tg_id = %s)
+            """,
+            (feedback_id, user_id),
+        )
         con.commit()
     finally:
         con.close()
