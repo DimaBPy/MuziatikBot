@@ -128,7 +128,7 @@ def forget_name(user_id: int):
         con.close()
 
 
-def create_feedback(user_id: int, message: str, urgent: bool = False) -> int:
+def create_feedback(user_id: int, message: str) -> int:
     cur, con = connect_db()
     try:
         cur.execute(

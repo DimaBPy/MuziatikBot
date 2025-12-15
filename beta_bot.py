@@ -228,7 +228,7 @@ async def donate(callback_query: CallbackQuery):
         description='10 звёзд за раз',
         payload='donate',
         currency='XTR',
-        prices=[LabeledPrice(label='Донат', amount=30)]
+        prices=[LabeledPrice(label='Донат', amount=10)]
     )
 
 
