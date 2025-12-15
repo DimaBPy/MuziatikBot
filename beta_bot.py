@@ -8,8 +8,9 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
     InputTextMessageContent
 from dotenv import load_dotenv
 from pydub import AudioSegment
+from transliterate import translit
 
-from db import remember, recall, forget, forget_name
+from db import remember, recall, forget, forget_name, create_feedback, get_feedback
 
 
 def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
@@ -105,8 +106,8 @@ async def info(message: Message):
         name = name if name != ["Нет элементов в памяти😔"] else "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 3\\.0 beta\n"
-        "Вы можете узнать про доступность функций по кнопке под сообщением\n"
+        "Версия — 3\\.0\n"
+        "Вы можете узнать про доступность функций по кнопке под сообщением\\.\n"
         "Описание: Начиная с версии 2\\.0, бот стал полезным в повседневной жизни\\.\n"
         "Вот мои функции:\n"
         "*Расшифровка голосовых сообщений в текст*:\n"
@@ -123,8 +124,7 @@ async def info(message: Message):
 
 async def status(callback_query: CallbackQuery):
     await callback_query.message.edit_text(
-        "Выбрать имя — ✅\n"
-        "Кубик (Обновлено) — ✅\n"
+        "Кубик — ✅\n"
         "Отзыв — ✅\n"
         "*Память*🧠 — ✅\n"
         "*Расшифровка голосовых сообщений в текст* — ✅\n",
@@ -136,7 +136,12 @@ async def changelog(callback_query: CallbackQuery):
         "В Версии 2.1: Добавлена расшифровка голосовых сообщений.\n"
         "2.2: Кубик и тд. в чатах с другими людьми\n"
         "2.3: Расшифровка стала платной😈\n"
-        "...Скоро тут будет продолжение..."
+        "2.4: Улучшена память\n"
+        "2.5: Исправлена оплата\n"
+        "2.6: Добавлены донаты\n"
+        "2.7: Упрощён кубик\n"
+        "3.0 beta: База данных, разные версии\n"
+        "3.0: Текущая версия: Всё допилено, добавлены ID для отзывов/вопросов"
     )
 
 
@@ -223,7 +228,7 @@ async def donate(callback_query: CallbackQuery):
         description='10 звёзд за раз',
         payload='donate',
         currency='XTR',
-        prices=[LabeledPrice(label='Донат', amount=10)]
+        prices=[LabeledPrice(label='Донат', amount=30)]
     )
 
 
@@ -453,22 +458,25 @@ async def successful_payment_handler(message: Message, bot: Bot):
 
 async def everything(message: Message, bot: Bot):
     if keyboard_input.get(message.from_user.id) == 'name':
-        remember(message.from_user.id, message.text, field=True)
+        remember(message.from_user.id, message.text, field='name')
         del keyboard_input[message.from_user.id]
-        await message.answer(f'Запомнил! Теперь вы — '
-                             f'{recall(message.from_user.id, field='name')}')
+        await message.answer(
+            f'Запомнил! Теперь вы — '
+            f'{recall(message.from_user.id, field="name")}'
+        )
     elif keyboard_input.get(message.from_user.id) == 'feedback':
         await send_typing_indicator(message.from_user.id, bot)
-        await bot.send_message(MY_CHAT_ID, f'Хозяин, у тебя отзыв.\n{message.text}')
         await asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
-        remember(message.from_user.id, message.text, field='feedback')
-        await message.answer('Сообщение зарегистрировано: номер — TODO')
+        await message.answer(
+            f"Сообщение зарегистрировано: номер — {(feedback_id := create_feedback(message.from_user.id, message.text))}"
+        )
+        await bot.send_message(MY_CHAT_ID,
+                               f'Хозяин, у тебя отзыв.\n {get_feedback(message.from_user.id, feedback_id)}')
         del keyboard_input[message.from_user.id]
     elif keyboard_input.get(message.from_user.id) == 'remember':
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
         remember(message.from_user.id, message.text)
-        await message.answer(f'Запомнил!\n'
-                             f'{message.text}')
+        await message.answer(f'Запомнил!\n{message.text}')
         del keyboard_input[message.from_user.id]
     elif keyboard_input.get(message.from_user.id) == 'forget':
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=2))
