@@ -160,7 +160,7 @@ def get_feedback(user_id: int, _id=None):
                 (user_id,),
             )
             rows = cur.fetchall()
-            return [(row[0], row[1], bool(row[2])) for row in rows]
+            return [(row[0], row[1]) for row in rows]
         else:
             cur.execute(
                 """
