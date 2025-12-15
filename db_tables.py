@@ -41,7 +41,7 @@ def create():
                     id      SMALLSERIAL PRIMARY KEY,
                     user_id INTEGER,
                     message TEXT,
-                    urgent  INTEGER NOT NULL DEFAULT 0 CHECK (urgent IN (0, 1)),
+                    urgent BOOLEAN NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users (id)
                 );
                 """)

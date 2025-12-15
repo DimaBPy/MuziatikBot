@@ -1,11 +1,15 @@
-import os
 import datetime
+import os
+
 import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def connect_db():
     con = psycopg2.connect(
-        dbname=os.getenv('DATABASE', 'muziatikbot'),
+        dbname=os.getenv('DATABASE'),
         user=os.getenv('DBUSER'),
         password=os.getenv('DB_PSWD'),
         host='localhost',
@@ -71,10 +75,10 @@ def recall(user_id: int, field=None):
             result = row[0] if row else None
         else:
             cur.execute('''SELECT memory.id, data
-                                    FROM memory
-                                             JOIN users ON memory.user_id = users.id
+                           FROM memory
+                                    JOIN users ON memory.user_id = users.id
                            WHERE users.tg_id = %s
-                                 ''', (user_id,))
+                        ''', (user_id,))
             result = list()
             data = cur.fetchall()
             if field == 'id':
@@ -129,11 +133,11 @@ def create_feedback(user_id: int, message: str, urgent: bool = False) -> int:
     try:
         cur.execute(
             """
-            INSERT INTO feedback (user_id, message, urgent)
-            VALUES ((SELECT id FROM users WHERE tg_id = %s), %s, %s)
+            INSERT INTO feedback (user_id, message)
+            VALUES ((SELECT id FROM users WHERE tg_id = %s), %s)
             RETURNING id
             """,
-            (user_id, message, int(urgent)),
+            (user_id, message),
         )
         feedback_id = cur.fetchone()[0]
         con.commit()
@@ -142,20 +146,34 @@ def create_feedback(user_id: int, message: str, urgent: bool = False) -> int:
         con.close()
 
 
-def get_feedback(user_id: int):
+def get_feedback(user_id: int, _id=None):
     cur, con = connect_db()
     try:
-        cur.execute(
-            """
-            SELECT id, message, urgent
-            FROM feedback
-            WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)
-            ORDER BY id
-            """,
-            (user_id,),
-        )
-        rows = cur.fetchall()
-        return [(row[0], row[1], bool(row[2])) for row in rows]
+        if _id is None:
+            cur.execute(
+                """
+                SELECT id, message
+                FROM feedback
+                WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)
+                ORDER BY id
+                """,
+                (user_id,),
+            )
+            rows = cur.fetchall()
+            return [(row[0], row[1]) for row in rows]
+        else:
+            cur.execute(
+                """
+                SELECT id, message
+                FROM feedback
+                WHERE user_id = (SELECT id FROM users WHERE tg_id = %s)
+                  AND id = %s
+                ORDER BY id
+                """,
+                (user_id, _id),
+            )
+            rows = cur.fetchall()
+            return [(row[0], row[1]) for row in rows]
     finally:
         con.close()
 
@@ -165,7 +183,8 @@ def delete_feedback(user_id: int, feedback_id: int) -> None:
     try:
         cur.execute(
             """
-            DELETE FROM feedback
+            DELETE
+            FROM feedback
             WHERE id = %s
               AND user_id = (SELECT id FROM users WHERE tg_id = %s)
             """,
