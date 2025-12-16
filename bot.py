@@ -1,6 +1,7 @@
 import asyncio
 import os
 from aiogram import Bot, Dispatcher, Router, types, F
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import ClientSession, TCPConnector
 import aiodns
 from aiogram.filters import Command
@@ -152,16 +153,21 @@ async def stable(callback_query: types.CallbackQuery):
 # ======== Main ========
 
 async def main():
-    # Configure Bot to use aiodns resolver via aiohttp session
+    # Configure Bot to use aiodns resolver via aiohttp session wrapped by Aiogram's AiohttpSession
     loop = asyncio.get_event_loop()
     resolver = aiodns.DNSResolver(loop=loop)
     connector = TCPConnector(resolver=resolver)
-    session = ClientSession(connector=connector)
+    aiohttp_session = ClientSession(connector=connector)
 
-    bot = Bot(api_token_muziatikbot, session=session)
+    aiogram_session = AiohttpSession(session=aiohttp_session)
+    bot = Bot(api_token_muziatikbot, session=aiogram_session)
     dp = Dispatcher()
     dp.include_router(router)
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        # Ensure we close the underlying aiohttp session on shutdown
+        await aiohttp_session.close()
 
 
 # ======== Payments Handlers ========
