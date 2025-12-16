@@ -1,6 +1,8 @@
 import asyncio
 import os
 from aiogram import Bot, Dispatcher, Router, types, F
+from aiohttp import ClientSession, TCPConnector
+import aiodns
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
@@ -150,7 +152,13 @@ async def stable(callback_query: types.CallbackQuery):
 # ======== Main ========
 
 async def main():
-    bot = Bot(api_token_muziatikbot)
+    # Configure Bot to use aiodns resolver via aiohttp session
+    loop = asyncio.get_event_loop()
+    resolver = aiodns.DNSResolver(loop=loop)
+    connector = TCPConnector(resolver=resolver)
+    session = ClientSession(connector=connector)
+
+    bot = Bot(api_token_muziatikbot, session=session)
     dp = Dispatcher()
     dp.include_router(router)
     await dp.start_polling(bot)
