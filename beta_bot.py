@@ -1,14 +1,14 @@
 import asyncio
 import os
-import speech_recognition as sr
 import time
+
+import speech_recognition as sr
 from aiogram import Bot
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, \
     InlineQueryResultArticle, LabeledPrice, Message, CallbackQuery, InlineQuery, PreCheckoutQuery, \
     InputTextMessageContent
 from dotenv import load_dotenv
 from pydub import AudioSegment
-from transliterate import translit
 
 from db import remember, recall, forget, forget_name, create_feedback, get_feedback
 
