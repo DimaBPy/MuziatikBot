@@ -206,7 +206,7 @@ async def memory(callback_query: CallbackQuery):
         await callback_query.answer('Хорошо')
         await callback_query.message.answer('Напишите номер объекта, который хотите удалить')
         await callback_query.message.answer('Или напишите "Все"')
-        await send_typing_indicator(callback_query.message.chat.id, callback_query.bot, wait=5)
+        await send_typing_indicator(callback_query.message.chat.id, callback_query.bot, wait=3)
         await callback_query.message.answer('\n'.join(recall(callback_query.from_user.id)))
 
 
