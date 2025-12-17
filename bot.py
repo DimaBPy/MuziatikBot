@@ -175,7 +175,9 @@ async def everything(message: Message, bot: Bot):
 async def main():
     loop = asyncio.get_event_loop()
     resolver = AsyncResolver(loop=loop)
-    connector = TCPConnector(resolver=resolver)
+
+    # We add ssl=False here to bypass the 60-second handshake timeout
+    connector = TCPConnector(resolver=resolver, ssl=False)
 
     async with ClientSession(connector=connector) as aio_session:
         session_wrapper = AiohttpSession()
@@ -192,7 +194,6 @@ async def main():
             await dp.start_polling(bot)
         finally:
             await bot.session.close()
-
 
 if __name__ == "__main__":
     try:
