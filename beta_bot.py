@@ -190,8 +190,7 @@ async def set_name(callback_query: CallbackQuery, bot: Bot):
 
 async def memory(callback_query: CallbackQuery):
     if callback_query.data == 'remember':
-        await callback_query.answer('Пишите. Правила: 🆕как хотите',
-                                    show_alert=True)
+        await callback_query.message.answer('Пишите, что нужно запомнить')
         keyboard_input[callback_query.from_user.id] = 'remember'
 
     elif callback_query.data == 'recall':
