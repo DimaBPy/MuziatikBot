@@ -1,13 +1,14 @@
 import asyncio
 import os
-import aiodns
+
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiohttp import ClientSession, TCPConnector
-from aiohttp.resolver import AsyncResolver
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiohttp import ClientSession, TCPConnector
+from aiohttp.resolver import AsyncResolver
 from dotenv import load_dotenv
+import ssl
 
 import beta_bot
 import stable_bot
@@ -176,8 +177,13 @@ async def main():
     loop = asyncio.get_event_loop()
     resolver = AsyncResolver(loop=loop)
 
-    # We add ssl=False here to bypass the 60-second handshake timeout
-    connector = TCPConnector(resolver=resolver, ssl=False)
+    # Create a 'do-nothing' SSL context
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
+    # Pass the context directly to the connector
+    connector = TCPConnector(resolver=resolver, ssl=ssl_context)
 
     async with ClientSession(connector=connector) as aio_session:
         session_wrapper = AiohttpSession()
@@ -194,6 +200,7 @@ async def main():
             await dp.start_polling(bot)
         finally:
             await bot.session.close()
+
 
 if __name__ == "__main__":
     try:
