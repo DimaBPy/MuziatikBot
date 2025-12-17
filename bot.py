@@ -1,5 +1,6 @@
 import asyncio
 import os
+import socket
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -178,18 +179,15 @@ async def main():
     loop = asyncio.get_event_loop()
     resolver = AsyncResolver(loop=loop)
 
-    # We use a totally empty SSL context to force a bypass
-    import ssl
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    # family=socket.AF_INET forces the bot to use IPv4 only
+    # This bypasses the broken IPv6 path that's causing the 60s timeout
+    connector = TCPConnector(
+        resolver=resolver,
+        family=socket.AF_INET,
+        ssl=False
+    )
 
-    connector = TCPConnector(resolver=resolver, ssl=ctx)
-
-    # We set a custom timeout so it doesn't just hang for 60 seconds and die
-    timeout = ClientTimeout(total=30, connect=15, sock_connect=15)
-
-    async with ClientSession(connector=connector, timeout=timeout) as aio_session:
+    async with ClientSession(connector=connector) as aio_session:
         session_wrapper = AiohttpSession()
         session_wrapper._session = aio_session
         session_wrapper._should_reset_connector = False 
