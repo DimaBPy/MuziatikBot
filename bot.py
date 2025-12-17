@@ -6,6 +6,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import ClientSession, TCPConnector
+from aiohttp import ClientTimeout
 from aiohttp.resolver import AsyncResolver
 from dotenv import load_dotenv
 import ssl
@@ -177,19 +178,22 @@ async def main():
     loop = asyncio.get_event_loop()
     resolver = AsyncResolver(loop=loop)
 
-    # Create a 'do-nothing' SSL context
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+    # We use a totally empty SSL context to force a bypass
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
 
-    # Pass the context directly to the connector
-    connector = TCPConnector(resolver=resolver, ssl=ssl_context)
+    connector = TCPConnector(resolver=resolver, ssl=ctx)
 
-    async with ClientSession(connector=connector) as aio_session:
+    # We set a custom timeout so it doesn't just hang for 60 seconds and die
+    timeout = ClientTimeout(total=30, connect=15, sock_connect=15)
+
+    async with ClientSession(connector=connector, timeout=timeout) as aio_session:
         session_wrapper = AiohttpSession()
         session_wrapper._session = aio_session
-        session_wrapper._should_reset_connector = False
-
+        session_wrapper._should_reset_connector = False 
+        
         bot = Bot(token=api_token_muziatikbot, session=session_wrapper)
         dp = Dispatcher()
         dp.include_router(router)
