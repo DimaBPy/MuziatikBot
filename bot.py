@@ -1,16 +1,14 @@
 import asyncio
 import os
 import socket
-
+import aiodns
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiohttp import ClientSession, TCPConnector
+from aiohttp.resolver import AsyncResolver
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from aiohttp import ClientSession, TCPConnector
-from aiohttp import ClientTimeout
-from aiohttp.resolver import AsyncResolver
 from dotenv import load_dotenv
-import ssl
 
 import beta_bot
 import stable_bot
@@ -179,19 +177,14 @@ async def main():
     loop = asyncio.get_event_loop()
     resolver = AsyncResolver(loop=loop)
 
-    # family=socket.AF_INET forces the bot to use IPv4 only
-    # This bypasses the broken IPv6 path that's causing the 60s timeout
-    connector = TCPConnector(
-        resolver=resolver,
-        family=socket.AF_INET,
-        ssl=False
-    )
+    # Minimal configuration: Async DNS and forced IPv4 for stability
+    connector = TCPConnector(resolver=resolver, family=socket.AF_INET)
 
     async with ClientSession(connector=connector) as aio_session:
         session_wrapper = AiohttpSession()
         session_wrapper._session = aio_session
-        session_wrapper._should_reset_connector = False 
-        
+        session_wrapper._should_reset_connector = False
+
         bot = Bot(token=api_token_muziatikbot, session=session_wrapper)
         dp = Dispatcher()
         dp.include_router(router)
