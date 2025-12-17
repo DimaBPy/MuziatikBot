@@ -1,9 +1,10 @@
 import asyncio
 import os
+import aiodns
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import ClientSession, TCPConnector
-import aiodns
+from aiohttp.resolver import AsyncResolver
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
@@ -38,10 +39,12 @@ load_dotenv()
 # ======== Config ========
 
 api_token_muziatikbot = os.getenv("API_TOKEN_muziatikBot")
+if not api_token_muziatikbot:
+    raise RuntimeError("Missing env var API_TOKEN_muziatikBot")
 
 try:
     MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
-except TypeError as e:
+except (TypeError, ValueError) as e:
     print(f'Ключа та нет... :\n{e}')
 
 router = Router()
@@ -69,12 +72,12 @@ async def changelog(callback_query: types.CallbackQuery):
     await _dispatch('changelog', callback_query.from_user.id)(callback_query)
 
 
-@router.message(lambda msg: msg.text == "Кубик" or msg.text == 'Roll a die')
+@router.message(lambda msg: msg.text in ["Кубик", 'Roll a die'])
 async def roll_dice(message: Message, bot: Bot):
     await _dispatch('roll_dice', message.from_user.id)(message, bot)
 
 
-@router.message(lambda msg: msg.text == 'Memory' or msg.text == 'Память')
+@router.message(lambda msg: msg.text in ['Memory', 'Память'])
 async def memory_menu(message: Message):
     await _dispatch('memory_menu', message.from_user.id)(message)
 
@@ -84,17 +87,17 @@ async def menu(message: Message):
     await _dispatch('menu', message.from_user.id)(message)
 
 
-@router.callback_query(lambda c: c.data == 'name')
+@router.callback_query(F.data == 'name')
 async def choose_name(callback_query: types.CallbackQuery, bot: Bot):
     await _dispatch('choose_name', callback_query.from_user.id)(callback_query, bot)
 
 
-@router.callback_query(lambda c: c.data in ['full_name', 'username', 'keyboard_input', 'no-name'])
+@router.callback_query(F.data.in_(['full_name', 'username', 'keyboard_input', 'no-name']))
 async def set_name(callback_query: types.CallbackQuery, bot: Bot):
     await _dispatch('set_name', callback_query.from_user.id)(callback_query, bot)
 
 
-@router.callback_query(lambda c: c.data == 'remember' or c.data == 'recall' or c.data == 'forget')
+@router.callback_query(F.data.in_(['remember', 'recall', 'forget']))
 async def memory(callback_query: types.CallbackQuery):
     await _dispatch('memory', callback_query.from_user.id)(callback_query)
 
@@ -109,7 +112,7 @@ async def donate(callback_query: types.CallbackQuery):
     await _dispatch('donate', callback_query.from_user.id)(callback_query)
 
 
-@router.message(lambda msg: msg.text == 'Вопрос/Отзыв' or msg.text == 'Feedback')
+@router.message(lambda msg: msg.text in ['Вопрос/Отзыв', 'Feedback'])
 async def feedback(message: Message):
     await _dispatch('feedback', message.from_user.id)(message)
 
@@ -126,16 +129,20 @@ async def voice_to_text(message: Message, bot: Bot):
 
 @router.inline_query()
 async def inline_emojis(inline_query: types.InlineQuery):
-    # Создаём список всех интерактивных эмодзи
     await _dispatch('inline_emojis', inline_query.from_user.id)(inline_query)
 
 
 @router.callback_query(F.data == 'chanel')
 async def chanel(callback_query: types.CallbackQuery):
-    await callback_query.message.edit_text('Выберете версию:',
-                                           reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                               [InlineKeyboardButton(text='beta', callback_data='beta')],
-                                               [InlineKeyboardButton(text='стабильная', callback_data='stable')]]))
+    await callback_query.message.edit_text(
+        'Выберете версию:',
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='beta', callback_data='beta')],
+                [InlineKeyboardButton(text='стабильная', callback_data='stable')]
+            ]
+        )
+    )
 
 
 @router.callback_query(F.data == 'beta')
@@ -149,28 +156,6 @@ async def stable(callback_query: types.CallbackQuery):
     remember(callback_query.from_user.id, 'False', 'beta')
     await callback_query.message.edit_text(text='Готово, теперь вы будете использовать стабильную версию')
 
-
-# ======== Main ========
-
-async def main():
-    # Configure Bot to use aiodns resolver via aiohttp session wrapped by Aiogram's AiohttpSession
-    loop = asyncio.get_event_loop()
-    resolver = aiodns.DNSResolver(loop=loop)
-    connector = TCPConnector(resolver=resolver)
-    aiohttp_session = ClientSession(connector=connector)
-
-    aiogram_session = AiohttpSession(session=aiohttp_session)
-    bot = Bot(api_token_muziatikbot, session=aiogram_session)
-    dp = Dispatcher()
-    dp.include_router(router)
-    try:
-        await dp.start_polling(bot)
-    finally:
-        # Ensure we close the underlying aiohttp session on shutdown
-        await aiohttp_session.close()
-
-
-# ======== Payments Handlers ========
 
 @router.pre_checkout_query()
 async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery, bot: Bot):
@@ -187,5 +172,30 @@ async def everything(message: Message, bot: Bot):
     await _dispatch('everything', message.from_user.id)(message, bot)
 
 
+async def main():
+    loop = asyncio.get_event_loop()
+    resolver = AsyncResolver(loop=loop)
+    connector = TCPConnector(resolver=resolver)
+
+    async with ClientSession(connector=connector) as aio_session:
+        session_wrapper = AiohttpSession()
+        session_wrapper._session = aio_session
+        session_wrapper._should_reset_connector = False
+
+        bot = Bot(token=api_token_muziatikbot, session=session_wrapper)
+        dp = Dispatcher()
+        dp.include_router(router)
+
+        print("Bot is live")
+
+        try:
+            await dp.start_polling(bot)
+        finally:
+            await bot.session.close()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Stopping the bot...")
