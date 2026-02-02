@@ -20,6 +20,22 @@ def _transcribe_wav(path: str, language: str = 'ru-RU') -> str:
     return r.recognize_google(audio_data, language=language)
 
 
+def switch_layout(text: str) -> str:
+    layout_map = {
+        "q": "й", "w": "ц", "e": "у", "r": "к", "t": "е", "y": "н", "u": "г", "i": "ш", "o": "щ", "p": "з", "[": "х",
+        "]": "ъ",
+        "a": "ф", "s": "ы", "d": "в", "f": "а", "g": "п", "h": "р", "j": "о", "k": "л", "l": "д", ";": "ж", "'": "э",
+        "z": "я", "x": "ч", "c": "с", "v": "м", "b": "и", "n": "т", "m": "ь", ",": "б", ".": "ю", "/": ".",
+        "Q": "Й", "W": "Ц", "E": "У", "R": "К", "T": "Е", "Y": "Н", "U": "Г", "I": "Ш", "O": "Щ", "P": "З", "{": "Х",
+        "}": "Ъ",
+        "A": "Ф", "S": "Ы", "D": "В", "F": "А", "G": "П", "H": "Р", "J": "О", "K": "Л", "L": "Д", ":": "Ж", "\"": "Э",
+        "Z": "Я", "X": "Ч", "C": "С", "V": "М", "B": "И", "N": "Т", "M": "Ь", "<": "Б", ">": "Ю", "?": ",",
+    }
+    reverse_map = {v: k for k, v in layout_map.items()}
+    full_map = {**layout_map, **reverse_map}
+    return "".join(full_map.get(char, char) for char in text)
+
+
 load_dotenv()
 
 # ======== Keyboards ========
@@ -106,7 +122,7 @@ async def info(message: Message):
         name = name if name != ["Нет элементов в памяти😔"] else "гость"
     await message.reply(
         f"Вот информация о MuziatikBot, {name}:\n"
-        "Версия — 3\\.0\n"
+        "Версия — 3\\.1\n"
         "Вы можете узнать про доступность функций по кнопке под сообщением\\.\n"
         "Описание: Начиная с версии 2\\.0, бот стал полезным в повседневной жизни\\.\n"
         "Меню \\> Донат: *Не даёт привилегий*: заплатите 10 звёзд, чтобы поддержать разработчика\n\n"
@@ -122,6 +138,7 @@ async def status(callback_query: CallbackQuery):
         "Кубик — ✅\n"
         "Отзыв — ✅\n"
         "*Память*🧠 — ✅\n"
+        "Перевод раскладки — ✅\n"
         "*Расшифровка голосовых сообщений в текст* — ✅:\n"
         "Просто отправьте или перешлите голосовое сообщение и я его расшифрую\n"
         "Бесплатно 10 голосовых сообщений в неделю, "
@@ -190,7 +207,7 @@ async def set_name(callback_query: CallbackQuery, bot: Bot):
 
 async def memory(callback_query: CallbackQuery):
     if callback_query.data == 'remember':
-        await callback_query.message.answer('Пишите')
+        await callback_query.message.answer('Пишите, что нужно запомнить')
         keyboard_input[callback_query.from_user.id] = 'remember'
 
     elif callback_query.data == 'recall':
@@ -454,39 +471,49 @@ async def successful_payment_handler(message: Message, bot: Bot):
 
 
 async def everything(message: Message, bot: Bot):
-    if keyboard_input.get(message.from_user.id) == 'name':
-        remember(message.from_user.id, message.text, field='name')
-        del keyboard_input[message.from_user.id]
+    user_id = message.from_user.id
+    if keyboard_input.get(user_id) == 'name':
+        remember(user_id, message.text, field='name')
+        del keyboard_input[user_id]
         await message.answer(
             f'Запомнил! Теперь вы — '
-            f'{recall(message.from_user.id, field="name")}'
+            f'{recall(user_id, field="name")}'
         )
-    elif keyboard_input.get(message.from_user.id) == 'feedback':
-        await send_typing_indicator(message.from_user.id, bot)
+    elif keyboard_input.get(user_id) == 'feedback':
+        await send_typing_indicator(user_id, bot)
         await asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
+        feedback_id = create_feedback(user_id, message.text)
         await message.answer(
-            f"Сообщение зарегистрировано: номер — {(feedback_id := create_feedback(message.from_user.id, message.text))}"
+            f"Сообщение зарегистрировано: номер — {feedback_id}"
         )
         await bot.send_message(MY_CHAT_ID,
-                               f'Хозяин, у тебя отзыв.\n {get_feedback(message.from_user.id, feedback_id)}')
-        del keyboard_input[message.from_user.id]
-    elif keyboard_input.get(message.from_user.id) == 'remember':
+                               f'Хозяин, у тебя отзыв.\n {get_feedback(user_id, feedback_id)}')
+        del keyboard_input[user_id]
+    elif keyboard_input.get(user_id) == 'remember':
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=3))
-        remember(message.from_user.id, message.text)
+        remember(user_id, message.text)
         await message.answer(f'Запомнил!\n{message.text}')
-        del keyboard_input[message.from_user.id]
-    elif keyboard_input.get(message.from_user.id) == 'forget':
+        del keyboard_input[user_id]
+    elif keyboard_input.get(user_id) == 'forget':
         asyncio.create_task(send_typing_indicator(message.chat.id, bot, wait=2))
-        del keyboard_input[message.from_user.id]
+        del keyboard_input[user_id]
         if message.text.lower() in ('все', 'всё'):
-            forget(message.from_user.id)
+            forget(user_id)
             await message.reply('Удалил все записи')
             return
-        if message.text not in recall(message.from_user.id, 'id'):
+        if message.text not in recall(user_id, 'id'):
             await message.answer('Такого ключа нет')
             return
-        forget(message.from_user.id, message.text)
+        forget(user_id, message.text)
         await message.answer(f'Удалил ключ {message.text} и его значение')
     else:
+        # Отправляем стандартное предупреждение
         await message.reply(
-            'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите на 4 квадрата слева от скрепки')
+            'Используйте кнопки (должны быть снизу экрана), а если их нет: нажмите на 4 квадрата слева от скрепки\n'
+            'Или вы хотели переключить раскладку? Вот👇'
+        )
+
+        # Отправляем исправленный текст отдельным сообщением (стиль Punto Switcher)
+        switched_text = switch_layout(message.text)
+        if switched_text != message.text:
+            await message.answer(switched_text)
