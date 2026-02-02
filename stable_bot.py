@@ -80,8 +80,14 @@ api_token_muziatikbot = os.getenv("API_TOKEN_muziatikBot")
 
 try:
     MY_CHAT_ID = int(os.getenv('MY_CHAT_ID'))
-except TypeError as e:
-    print(f'Ключа та нет... :\n{e}')
+except (TypeError, ValueError) as e:
+    print(f'MY_CHAT_ID not set: {e}')
+    MY_CHAT_ID = None
+
+try:
+    DADDY_CHAT_ID = int(os.getenv('DADDY_CHAT_ID'))
+except (TypeError, ValueError):
+    DADDY_CHAT_ID = None
 
 keyboard_input = {}
 
@@ -230,7 +236,7 @@ async def dev(message: Message):
     await send_typing_indicator(message.chat.id, message.bot, wait=2)
     await message.reply('Проверяю')
     await send_typing_indicator(message.chat.id, message.bot, wait=3)
-    if message.from_user.id == MY_CHAT_ID or message.from_user.id == os.getenv('DADDY_CHAT_ID'):
+    if message.from_user.id == MY_CHAT_ID or message.from_user.id == DADDY_CHAT_ID:
         await message.reply('Okei-dokei', reply_markup=dev_keyboard)
     else:
         await message.reply('Вы не разработчик')
