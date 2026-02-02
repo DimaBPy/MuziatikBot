@@ -516,6 +516,7 @@ async def everything(message: Message, bot: Bot):
         )
 
         # Отправляем исправленный текст отдельным сообщением (стиль Punto Switcher)
-        switched_text = switch_layout(message.text)
-        if switched_text != message.text:
-            await message.answer(switched_text)
+        if message.text:
+            switched_text = switch_layout(message.text)
+            if switched_text != message.text:
+                await message.answer(switched_text)
